@@ -458,7 +458,6 @@ def generate_captioned_video(
             dimensions=dimensions,
             shadow_blur=10,
             stroke_size=5,
-            position_from_top=0.8,
         )
         logger.debug(f"Arquivo de legenda criado em: {subtitle_path}")
         builder.set_captions(

@@ -186,6 +186,74 @@
             padding: 40px;
             color: #6b7280;
         }
+        
+        .upload-progress {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #f3f4f6;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #4f46e5;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .upload-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .upload-item:last-child {
+            border-bottom: none;
+        }
+        
+        .upload-status {
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+        
+        .status-uploading { color: #4f46e5; }
+        .status-success { color: #16a34a; }
+        .status-error { color: #ef4444; }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.3s ease;
+        }
+        
+        .notification.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .notification.success { background: #16a34a; }
+        .notification.error { background: #ef4444; }
     </style>
 </head>
 <body>
@@ -209,6 +277,16 @@
             
             <button class="btn btn-primary" onclick="loadFiles()">🔄 Atualizar</button>
             <button class="btn btn-secondary" onclick="loadStats()">📊 Estatísticas</button>
+            <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">📁 Upload Arquivo</button>
+            
+            <!-- Input de arquivo oculto -->
+            <input type="file" id="fileInput" style="display: none;" multiple accept="image/*,video/*,audio/*" onchange="handleFileUpload(event)">
+        </div>
+        
+        <!-- Área de progresso de upload -->
+        <div id="uploadProgress" class="upload-progress">
+            <h3>📤 Upload em Progresso</h3>
+            <div id="uploadList"></div>
         </div>
         
         <div id="content">
@@ -221,6 +299,152 @@
 
     <script>
         const API_BASE = '/api/v1/media';
+        
+        // Variáveis globais para upload
+        let uploadQueue = [];
+        let isUploading = false;
+        
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => notification.classList.add('show'), 100);
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => document.body.removeChild(notification), 300);
+            }, 3000);
+        }
+        
+        function detectMediaType(filename) {
+            const ext = filename.toLowerCase().split('.').pop();
+            
+            const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
+            const videoExts = ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv'];
+            const audioExts = ['mp3', 'wav', 'ogg', 'aac', 'm4a', 'flac'];
+            
+            if (imageExts.includes(ext)) return 'image';
+            if (videoExts.includes(ext)) return 'video';
+            if (audioExts.includes(ext)) return 'audio';
+            
+            return 'image'; // fallback
+        }
+        
+        function handleFileUpload(event) {
+            const files = Array.from(event.target.files);
+            if (files.length === 0) return;
+            
+            // Adiciona arquivos à fila
+            files.forEach(file => {
+                const uploadId = Date.now() + Math.random();
+                uploadQueue.push({
+                    id: uploadId,
+                    file: file,
+                    status: 'waiting',
+                    progress: 0,
+                    mediaType: detectMediaType(file.name)
+                });
+            });
+            
+            // Mostra a área de progresso
+            document.getElementById('uploadProgress').style.display = 'block';
+            updateUploadDisplay();
+            
+            // Inicia o upload se não estiver em andamento
+            if (!isUploading) {
+                processUploadQueue();
+            }
+            
+            // Limpa o input para permitir selecionar os mesmos arquivos novamente
+            event.target.value = '';
+        }
+        
+        function updateUploadDisplay() {
+            const uploadList = document.getElementById('uploadList');
+            uploadList.innerHTML = '';
+            
+            uploadQueue.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'upload-item';
+                div.innerHTML = `
+                    <div>
+                        <div>${item.file.name}</div>
+                        <div class="upload-status status-${item.status}">
+                            ${getStatusText(item.status)} ${item.progress > 0 ? `(${item.progress}%)` : ''}
+                        </div>
+                    </div>
+                    <div>${(item.file.size / (1024 * 1024)).toFixed(2)} MB</div>
+                `;
+                uploadList.appendChild(div);
+            });
+        }
+        
+        function getStatusText(status) {
+            switch(status) {
+                case 'waiting': return '⏳ Aguardando';
+                case 'uploading': return '📤 Enviando';
+                case 'success': return '✅ Concluído';
+                case 'error': return '❌ Erro';
+                default: return status;
+            }
+        }
+        
+        async function processUploadQueue() {
+            isUploading = true;
+            
+            while (uploadQueue.length > 0) {
+                const item = uploadQueue.find(i => i.status === 'waiting');
+                if (!item) break;
+                
+                item.status = 'uploading';
+                updateUploadDisplay();
+                
+                try {
+                    await uploadFile(item);
+                    item.status = 'success';
+                    item.progress = 100;
+                    showNotification(`✅ ${item.file.name} enviado com sucesso!`);
+                } catch (error) {
+                    item.status = 'error';
+                    showNotification(`❌ Erro ao enviar ${item.file.name}: ${error.message}`, 'error');
+                }
+                
+                updateUploadDisplay();
+            }
+            
+            isUploading = false;
+            
+            // Remove itens processados após 3 segundos
+            setTimeout(() => {
+                uploadQueue = uploadQueue.filter(i => i.status === 'waiting' || i.status === 'uploading');
+                if (uploadQueue.length === 0) {
+                    document.getElementById('uploadProgress').style.display = 'none';
+                }
+                updateUploadDisplay();
+                loadFiles(); // Atualiza a lista de arquivos
+                loadStats(); // Atualiza as estatísticas
+            }, 3000);
+        }
+        
+        async function uploadFile(item) {
+            const formData = new FormData();
+            formData.append('file', item.file);
+            formData.append('media_type', item.mediaType);
+            
+            const response = await fetch(`${API_BASE}/storage`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Erro no upload');
+            }
+            
+            const result = await response.json();
+            return result;
+        }
         
         async function loadStats() {
             try {
@@ -330,7 +554,7 @@
         async function copyId(mediaId) {
             try {
                 await navigator.clipboard.writeText(mediaId);
-                alert('ID copiado para a área de transferência!');
+                showNotification('📋 ID copiado para a área de transferência!');
             } catch (error) {
                 prompt('Copie este ID:', mediaId);
             }
@@ -347,14 +571,14 @@
                 });
                 
                 if (response.ok) {
-                    alert('Arquivo deletado com sucesso!');
+                    showNotification('🗑️ Arquivo deletado com sucesso!');
                     loadFiles();
                     loadStats();
                 } else {
-                    alert('Erro ao deletar arquivo');
+                    showNotification('❌ Erro ao deletar arquivo', 'error');
                 }
             } catch (error) {
-                alert('Erro ao deletar arquivo: ' + error.message);
+                showNotification('❌ Erro ao deletar arquivo: ' + error.message, 'error');
             }
         }
         

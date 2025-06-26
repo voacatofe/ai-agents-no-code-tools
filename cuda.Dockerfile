@@ -36,6 +36,7 @@ ENV LD_LIBRARY_PATH=/usr/local/lib/python3.10/dist-packages/nvidia/cudnn/lib:$LD
 COPY video /app/video
 COPY server.py /app/server.py
 COPY assets /app/assets
+COPY templates /app/templates
 
 ENV PYTHONUNBUFFERED=1
 

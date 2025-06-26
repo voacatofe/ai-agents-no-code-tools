@@ -444,8 +444,8 @@ def generate_captioned_video(
         tmp_file_ids.append(subtitle_id)
         segments = captionsManager.create_subtitle_segments_english(
             captions=captions,
-            lines=2,
-            max_length=40,
+            lines=1,
+            max_length=1,
         )
         logger.debug(f"Segmentos de legenda criados: {len(segments) if segments else 0}")
         if segments and len(segments) > 0:
@@ -453,11 +453,11 @@ def generate_captioned_video(
             
         captionsManager.create_subtitle(
             segments=segments,
-            font_size=80,
+            font_size=120,
             output_path=subtitle_path,
             dimensions=dimensions,
-            shadow_blur=3,
-            stroke_size=3,
+            shadow_blur=10,
+            stroke_size=5,
             position_from_top=0.8,
         )
         logger.debug(f"Arquivo de legenda criado em: {subtitle_path}")

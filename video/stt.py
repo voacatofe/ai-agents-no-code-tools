@@ -7,14 +7,14 @@ class STT:
     def __init__(self, model_size="tiny", compute_type="int8"):
         self.model = WhisperModel(model_size, compute_type=compute_type)
 
-    def transcribe(self, audio_path, beam_size=5):
+    def transcribe(self, audio_path, beam_size=5, language="pt"):
         logger.bind(
             device=device.type,
         ).debug(
             "transcribing audio with Whisper model",
         )
         segments, info = self.model.transcribe(
-            audio_path, beam_size=beam_size, word_timestamps=True
+            audio_path, beam_size=beam_size, word_timestamps=True, language=language
         )
 
         duration = info.duration

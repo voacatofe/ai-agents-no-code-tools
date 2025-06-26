@@ -395,7 +395,11 @@ def generate_captioned_video(
         if tts_audio_id:
             audio_path = storage.get_media_path(tts_audio_id)
             stt = STT(model_size="tiny")
-            captions = stt.transcribe(audio_path=audio_path)[0]
+            # Detecta o idioma baseado na voz selecionada
+            from video.tts import LANGUAGE_VOICE_MAP
+            lang_info = LANGUAGE_VOICE_MAP.get(kokoro_voice, {})
+            whisper_language = "pt" if lang_info.get("lang_code") == "p" else "en"
+            captions = stt.transcribe(audio_path=audio_path, language=whisper_language)[0]
             builder.set_audio(audio_path)
         # generate TTS and set audio
         else:
@@ -410,6 +414,11 @@ def generate_captioned_video(
                 speed=kokoro_speed,
             )[0]
         builder.set_audio(audio_path)
+
+        # Log para debug das legendas
+        logger.debug(f"Captions retornadas pelo TTS: {len(captions) if captions else 0} itens")
+        if captions and len(captions) > 0:
+            logger.debug(f"Exemplo de caption: {captions[0]}")
 
         # create subtitle
         captionsManager = Caption()

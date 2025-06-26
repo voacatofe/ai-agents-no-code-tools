@@ -241,6 +241,83 @@ def upload_file(
         return {"file_id": file_id}
 
 
+# Endpoints específicos PRIMEIRO (ordem importa no FastAPI!)
+@v1_media_api_router.get("/storage/list")
+def list_files(media_type: Optional[str] = None, limit: Optional[int] = None):
+    """
+    Lista arquivos armazenados no sistema.
+    
+    Args:
+        media_type: Filtrar por tipo (image, video, audio)
+        limit: Limitar número de resultados
+    """
+    try:
+        files = storage.list_media(media_type)
+        
+        if limit:
+            files = files[:limit]
+            
+        return {
+            "files": files,
+            "total": len(files),
+            "media_type_filter": media_type or "all"
+        }
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": f"Erro ao listar arquivos: {str(e)}"}
+        )
+
+
+@v1_media_api_router.get("/storage/stats")
+def get_storage_stats():
+    """
+    Obtém estatísticas gerais do storage.
+    """
+    try:
+        stats = storage.get_storage_stats()
+        return stats
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": f"Erro ao obter estatísticas: {str(e)}"}
+        )
+
+
+# Endpoints com parâmetros DEPOIS
+@v1_media_api_router.get("/storage/{file_id}/info")
+def get_file_info(file_id: str):
+    """
+    Obtém informações detalhadas sobre um arquivo específico.
+    """
+    try:
+        info = storage.get_media_info(file_id)
+        return info
+    except FileNotFoundError:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"error": f"Arquivo {file_id} não encontrado"}
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": f"Erro ao obter informações: {str(e)}"}
+        )
+
+
+@v1_media_api_router.get("/storage/{file_id}/status")
+def file_status(file_id: str):
+    """
+    Check the status of a file by its ID.
+    """
+    tmp_id = storage.create_tmp_file_id(file_id)
+    if storage.media_exists(tmp_id):
+        return {"status": "processing"}
+    elif storage.media_exists(file_id):
+        return {"status": "ready"}
+    return {"status": "not_found"}
+
+
 @v1_media_api_router.get("/storage/{file_id}")
 def download_file(file_id: str):
     """
@@ -270,81 +347,6 @@ def delete_file(file_id: str):
     if storage.media_exists(file_id):
         storage.delete_media(file_id)
     return {"status": "success"}
-
-
-@v1_media_api_router.get("/storage/{file_id}/status")
-def file_status(file_id: str):
-    """
-    Check the status of a file by its ID.
-    """
-    tmp_id = storage.create_tmp_file_id(file_id)
-    if storage.media_exists(tmp_id):
-        return {"status": "processing"}
-    elif storage.media_exists(file_id):
-        return {"status": "ready"}
-    return {"status": "not_found"}
-
-
-@v1_media_api_router.get("/storage/list")
-def list_files(media_type: Optional[str] = None, limit: Optional[int] = None):
-    """
-    Lista arquivos armazenados no sistema.
-    
-    Args:
-        media_type: Filtrar por tipo (image, video, audio)
-        limit: Limitar número de resultados
-    """
-    try:
-        files = storage.list_media(media_type)
-        
-        if limit:
-            files = files[:limit]
-            
-        return {
-            "files": files,
-            "total": len(files),
-            "media_type_filter": media_type or "all"
-        }
-    except Exception as e:
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"error": f"Erro ao listar arquivos: {str(e)}"}
-        )
-
-
-@v1_media_api_router.get("/storage/{file_id}/info")
-def get_file_info(file_id: str):
-    """
-    Obtém informações detalhadas sobre um arquivo específico.
-    """
-    try:
-        info = storage.get_media_info(file_id)
-        return info
-    except FileNotFoundError:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"error": f"Arquivo {file_id} não encontrado"}
-        )
-    except Exception as e:
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"error": f"Erro ao obter informações: {str(e)}"}
-        )
-
-
-@v1_media_api_router.get("/storage/stats")
-def get_storage_stats():
-    """
-    Obtém estatísticas gerais do storage.
-    """
-    try:
-        stats = storage.get_storage_stats()
-        return stats
-    except Exception as e:
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"error": f"Erro ao obter estatísticas: {str(e)}"}
-        )
 
 
 @v1_media_api_router.post("/video-tools/merge")

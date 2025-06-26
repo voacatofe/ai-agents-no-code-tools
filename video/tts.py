@@ -101,10 +101,7 @@ class TTS:
         lang_code = LANGUAGE_VOICE_MAP.get(voice, {}).get("lang_code")
         if not lang_code:
             raise ValueError(f"Voice '{voice}' not found in LANGUAGE_VOICE_MAP")
-        if lang_code != "a":
-            raise NotImplementedError(
-                f"TTS for language code '{lang_code}' is not implemented."
-            )
+        # Removida a restrição para permitir outros idiomas além do inglês americano
         start = time.time()
 
         context_logger = logger.bind(
@@ -221,7 +218,7 @@ class TTS:
             "TTS generation with Chatterbox completed",
         )
 
-    def valid_kokoro_voices(self, lang_code: str = "en-us") -> List[str]:
+    def valid_kokoro_voices(self, lang_code: str = None) -> List[str]:
         """
         Returns a list of valid voices for the given language code.
         If no language code is provided, returns all voices.

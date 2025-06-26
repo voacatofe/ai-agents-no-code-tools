@@ -19,6 +19,7 @@ RUN apt update && apt install -y \
     python3.10-gdbm \
     ffmpeg \
     libsndfile1 \
+    espeak-ng \
     fonts-dejavu \
     && rm -rf /var/lib/apt/lists/*
 

@@ -56,11 +56,27 @@ storage = Storage(
 )
 
 
+@v1_media_api_router.get("/audio-tools/tts/kokoro/languages")
+def get_kokoro_languages():
+    """
+    Get available Kokoro languages.
+    """
+    from video.tts import LANGUAGE_VOICE_CONFIG
+    languages = list(LANGUAGE_VOICE_CONFIG.keys())
+    return {"languages": languages}
+
+
 @v1_media_api_router.get("/audio-tools/tts/kokoro/voices")
-def get_kokoro_voices():
+def get_kokoro_voices(lang_code: Optional[str] = None):
+    """
+    Get available Kokoro voices.
+    
+    Args:
+        lang_code: Language code (e.g., 'pt-br', 'en-us', 'pt'). If not provided, returns all voices.
+    """
     tts_manager = TTS()
-    voices = tts_manager.valid_kokoro_voices()
-    return {"voices": voices}
+    voices = tts_manager.valid_kokoro_voices(lang_code=lang_code)
+    return {"voices": voices, "language": lang_code or "all"}
 
 
 @v1_media_api_router.post("/audio-tools/tts/kokoro")

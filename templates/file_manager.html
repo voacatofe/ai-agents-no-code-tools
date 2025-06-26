@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerenciador de Arquivos - AI Agents Tools</title>
+    <title>File Manager - AI Agents Tools</title>
     <style>
         * {
             margin: 0;
@@ -259,8 +259,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🗂️ Gerenciador de Arquivos</h1>
-            <p>Visualize e gerencie os arquivos enviados para o sistema</p>
+            <h1>🗂️ File Manager</h1>
+            <p>View and manage files uploaded to the system</p>
         </div>
         
         <div class="stats" id="stats">
@@ -269,30 +269,30 @@
         
         <div class="controls">
             <select id="typeFilter">
-                <option value="">Todos os tipos</option>
-                <option value="image">Imagens</option>
-                <option value="video">Vídeos</option>
-                <option value="audio">Áudios</option>
+                <option value="">All Types</option>
+                <option value="image">Images</option>
+                <option value="video">Videos</option>
+                <option value="audio">Audio</option>
             </select>
             
-            <button class="btn btn-primary" onclick="loadFiles()">🔄 Atualizar</button>
-            <button class="btn btn-secondary" onclick="loadStats()">📊 Estatísticas</button>
-            <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">📁 Upload Arquivo</button>
+            <button class="btn btn-primary" onclick="loadFiles()">🔄 Refresh</button>
+            <button class="btn btn-secondary" onclick="loadStats()">📊 Statistics</button>
+            <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">📁 Upload Files</button>
             
-            <!-- Input de arquivo oculto -->
+            <!-- Hidden file input -->
             <input type="file" id="fileInput" style="display: none;" multiple accept="image/*,video/*,audio/*" onchange="handleFileUpload(event)">
         </div>
         
-        <!-- Área de progresso de upload -->
+        <!-- Upload progress area -->
         <div id="uploadProgress" class="upload-progress">
-            <h3>📤 Upload em Progresso</h3>
+            <h3>📤 Upload in Progress</h3>
             <div id="uploadList"></div>
         </div>
         
         <div id="content">
             <div class="loading">
                 <div class="spinner"></div>
-                <p>Carregando arquivos...</p>
+                <p>Loading files...</p>
             </div>
         </div>
     </div>
@@ -382,10 +382,10 @@
         
         function getStatusText(status) {
             switch(status) {
-                case 'waiting': return '⏳ Aguardando';
-                case 'uploading': return '📤 Enviando';
-                case 'success': return '✅ Concluído';
-                case 'error': return '❌ Erro';
+                case 'waiting': return '⏳ Waiting';
+                case 'uploading': return '📤 Uploading';
+                case 'success': return '✅ Completed';
+                case 'error': return '❌ Error';
                 default: return status;
             }
         }
@@ -404,10 +404,10 @@
                     await uploadFile(item);
                     item.status = 'success';
                     item.progress = 100;
-                    showNotification(`✅ ${item.file.name} enviado com sucesso!`);
+                    showNotification(`✅ ${item.file.name} uploaded successfully!`);
                 } catch (error) {
                     item.status = 'error';
-                    showNotification(`❌ Erro ao enviar ${item.file.name}: ${error.message}`, 'error');
+                    showNotification(`❌ Error uploading ${item.file.name}: ${error.message}`, 'error');
                 }
                 
                 updateUploadDisplay();
@@ -439,7 +439,7 @@
             
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || 'Erro no upload');
+                throw new Error(errorData.error || 'Upload error');
             }
             
             const result = await response.json();
@@ -455,23 +455,23 @@
                 statsContainer.innerHTML = `
                     <div class="stat-card">
                         <div class="stat-number">${stats.total_files}</div>
-                        <div>Total de Arquivos</div>
+                        <div>Total Files</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-number">${stats.total_size_mb} MB</div>
-                        <div>Espaço Utilizado</div>
+                        <div>Storage Used</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-number">${stats.by_type.image?.count || 0}</div>
-                        <div>Imagens</div>
+                        <div>Images</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-number">${stats.by_type.video?.count || 0}</div>
-                        <div>Vídeos</div>
+                        <div>Videos</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-number">${stats.by_type.audio?.count || 0}</div>
-                        <div>Áudios</div>
+                        <div>Audio</div>
                     </div>
                 `;
             } catch (error) {
@@ -486,7 +486,7 @@
             content.innerHTML = `
                 <div class="loading">
                     <div class="spinner"></div>
-                    <p>Carregando arquivos...</p>
+                    <p>Loading files...</p>
                 </div>
             `;
             
@@ -501,8 +501,8 @@
                 if (data.files.length === 0) {
                     content.innerHTML = `
                         <div class="empty-state">
-                            <h3>📁 Nenhum arquivo encontrado</h3>
-                            <p>Faça upload de alguns arquivos para vê-los aqui</p>
+                            <h3>📁 No files found</h3>
+                            <p>Upload some files to see them here</p>
                         </div>
                     `;
                     return;
@@ -514,7 +514,7 @@
                         <div class="file-name">${file.filename}</div>
                         <div class="file-info">
                             <div>📦 ${file.size_mb} MB</div>
-                            <div>📅 ${new Date(file.created_at * 1000).toLocaleString('pt-BR')}</div>
+                            <div>📅 ${new Date(file.created_at * 1000).toLocaleString('en-US')}</div>
                             <div>🆔 ${file.media_id}</div>
                         </div>
                         <div class="file-actions">
@@ -522,10 +522,10 @@
                                 ⬇️ Download
                             </button>
                             <button class="btn btn-secondary btn-small" onclick="copyId('${file.media_id}')">
-                                📋 Copiar ID
+                                📋 Copy ID
                             </button>
                             <button class="btn btn-danger btn-small" onclick="deleteFile('${file.media_id}')">
-                                🗑️ Deletar
+                                🗑️ Delete
                             </button>
                         </div>
                     </div>
@@ -540,7 +540,7 @@
             } catch (error) {
                 content.innerHTML = `
                     <div class="empty-state">
-                        <h3>❌ Erro ao carregar arquivos</h3>
+                        <h3>❌ Error loading files</h3>
                         <p>${error.message}</p>
                     </div>
                 `;
@@ -554,14 +554,14 @@
         async function copyId(mediaId) {
             try {
                 await navigator.clipboard.writeText(mediaId);
-                showNotification('📋 ID copiado para a área de transferência!');
+                showNotification('📋 ID copied to clipboard!');
             } catch (error) {
-                prompt('Copie este ID:', mediaId);
+                prompt('Copy this ID:', mediaId);
             }
         }
         
         async function deleteFile(mediaId) {
-            if (!confirm(`Tem certeza que deseja deletar ${mediaId}?`)) {
+            if (!confirm(`Are you sure you want to delete ${mediaId}?`)) {
                 return;
             }
             
@@ -571,14 +571,14 @@
                 });
                 
                 if (response.ok) {
-                    showNotification('🗑️ Arquivo deletado com sucesso!');
+                    showNotification('🗑️ File deleted successfully!');
                     loadFiles();
                     loadStats();
                 } else {
-                    showNotification('❌ Erro ao deletar arquivo', 'error');
+                    showNotification('❌ Error deleting file', 'error');
                 }
             } catch (error) {
-                showNotification('❌ Erro ao deletar arquivo: ' + error.message, 'error');
+                showNotification('❌ Error deleting file: ' + error.message, 'error');
             }
         }
         

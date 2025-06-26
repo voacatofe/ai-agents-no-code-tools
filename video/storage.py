@@ -2,6 +2,7 @@ from typing import Tuple
 import uuid
 import os
 import requests
+import datetime
 
 
 class MediaType:
@@ -289,3 +290,112 @@ class Storage:
 
         file_extension = os.path.splitext(url)[1]
         return self.upload_media(media_type, response.content, file_extension)
+    
+    def list_media(self, media_type: str = None) -> list:
+        """
+        Lista todos os arquivos de mídia armazenados.
+        
+        Args:
+            media_type (str, optional): Tipo específico de mídia para filtrar
+            
+        Returns:
+            list: Lista de dicionários com informações dos arquivos
+        """
+        files = []
+        
+        media_types = [media_type] if media_type else [MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO]
+        
+        for mt in media_types:
+            media_path = os.path.join(self.storage_path, mt)
+            if not os.path.exists(media_path):
+                continue
+                
+            for filename in os.listdir(media_path):
+                if filename.startswith('.'):  # Ignorar arquivos ocultos
+                    continue
+                    
+                file_path = os.path.join(media_path, filename)
+                if os.path.isfile(file_path):
+                    try:
+                        stat = os.stat(file_path)
+                        media_id = f"{mt}_{filename}"
+                        
+                        files.append({
+                            "media_id": media_id,
+                            "media_type": mt,
+                            "filename": filename,
+                            "size_bytes": stat.st_size,
+                            "size_mb": round(stat.st_size / (1024 * 1024), 2),
+                            "created_at": stat.st_ctime,
+                            "modified_at": stat.st_mtime,
+                            "file_extension": os.path.splitext(filename)[1].lower()
+                        })
+                    except Exception as e:
+                        # Log erro mas continua listando outros arquivos
+                        print(f"Erro ao processar arquivo {filename}: {e}")
+                        
+        # Ordena por data de criação (mais recentes primeiro)
+        files.sort(key=lambda x: x["created_at"], reverse=True)
+        return files
+    
+    def get_media_info(self, media_id: str) -> dict:
+        """
+        Obtém informações detalhadas sobre um arquivo específico.
+        
+        Args:
+            media_id (str): ID do arquivo
+            
+        Returns:
+            dict: Informações detalhadas do arquivo
+        """
+        file_path = self._get_safe_file_path(media_id)
+        
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Media file {media_id} not found.")
+            
+        stat = os.stat(file_path)
+        media_type, filename = self._validate_media_id(media_id)
+        
+        return {
+            "media_id": media_id,
+            "media_type": media_type,
+            "filename": filename,
+            "file_path": file_path,
+            "size_bytes": stat.st_size,
+            "size_mb": round(stat.st_size / (1024 * 1024), 2),
+            "created_at": stat.st_ctime,
+            "modified_at": stat.st_mtime,
+            "file_extension": os.path.splitext(filename)[1].lower(),
+            "exists": True
+        }
+    
+    def get_storage_stats(self) -> dict:
+        """
+        Obtém estatísticas gerais do storage.
+        
+        Returns:
+            dict: Estatísticas do storage
+        """
+        stats = {
+            "total_files": 0,
+            "total_size_bytes": 0,
+            "total_size_mb": 0,
+            "by_type": {}
+        }
+        
+        for media_type in [MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO, MediaType.TMP]:
+            files = self.list_media(media_type)
+            count = len(files)
+            size = sum(f["size_bytes"] for f in files)
+            
+            stats["by_type"][media_type] = {
+                "count": count,
+                "size_bytes": size,
+                "size_mb": round(size / (1024 * 1024), 2)
+            }
+            
+            stats["total_files"] += count
+            stats["total_size_bytes"] += size
+            
+        stats["total_size_mb"] = round(stats["total_size_bytes"] / (1024 * 1024), 2)
+        return stats

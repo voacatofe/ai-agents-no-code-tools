@@ -1,5 +1,6 @@
 from fastapi import FastAPI, status, APIRouter, UploadFile, File, Form, BackgroundTasks
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from typing import Literal, Optional
 import os
 import signal
@@ -45,6 +46,26 @@ app = FastAPI()
 @app.get("/health")
 def read_root():
     return {"status": "ok"}
+
+
+@app.get("/files", response_class=HTMLResponse)
+def file_manager():
+    """
+    Interface web para gerenciar arquivos.
+    """
+    template_path = os.path.join(os.path.dirname(__file__), "templates", "file_manager.html")
+    try:
+        with open(template_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    except FileNotFoundError:
+        return HTMLResponse(content="""
+        <html>
+            <body>
+                <h1>Erro: Template não encontrado</h1>
+                <p>O arquivo de template não foi encontrado. Verifique se existe o arquivo templates/file_manager.html</p>
+            </body>
+        </html>
+        """, status_code=404)
 
 
 api_router = APIRouter()
@@ -262,6 +283,68 @@ def file_status(file_id: str):
     elif storage.media_exists(file_id):
         return {"status": "ready"}
     return {"status": "not_found"}
+
+
+@v1_media_api_router.get("/storage/list")
+def list_files(media_type: Optional[str] = None, limit: Optional[int] = None):
+    """
+    Lista arquivos armazenados no sistema.
+    
+    Args:
+        media_type: Filtrar por tipo (image, video, audio)
+        limit: Limitar número de resultados
+    """
+    try:
+        files = storage.list_media(media_type)
+        
+        if limit:
+            files = files[:limit]
+            
+        return {
+            "files": files,
+            "total": len(files),
+            "media_type_filter": media_type or "all"
+        }
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": f"Erro ao listar arquivos: {str(e)}"}
+        )
+
+
+@v1_media_api_router.get("/storage/{file_id}/info")
+def get_file_info(file_id: str):
+    """
+    Obtém informações detalhadas sobre um arquivo específico.
+    """
+    try:
+        info = storage.get_media_info(file_id)
+        return info
+    except FileNotFoundError:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"error": f"Arquivo {file_id} não encontrado"}
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": f"Erro ao obter informações: {str(e)}"}
+        )
+
+
+@v1_media_api_router.get("/storage/stats")
+def get_storage_stats():
+    """
+    Obtém estatísticas gerais do storage.
+    """
+    try:
+        stats = storage.get_storage_stats()
+        return stats
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": f"Erro ao obter estatísticas: {str(e)}"}
+        )
 
 
 @v1_media_api_router.post("/video-tools/merge")

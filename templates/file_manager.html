@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciador de Arquivos - AI Agents Tools</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #4f46e5;
+        }
+        
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: #4f46e5;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #3f37c9;
+        }
+        
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #4b5563;
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        
+        select {
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            background: white;
+        }
+        
+        .files-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        
+        .file-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        
+        .file-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .file-type {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        
+        .type-image { background: #dbeafe; color: #1d4ed8; }
+        .type-video { background: #fecaca; color: #dc2626; }
+        .type-audio { background: #dcfce7; color: #16a34a; }
+        
+        .file-name {
+            font-weight: 600;
+            margin-bottom: 8px;
+            word-break: break-all;
+        }
+        
+        .file-info {
+            font-size: 0.9em;
+            color: #6b7280;
+            margin-bottom: 15px;
+        }
+        
+        .file-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 0.8em;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #4f46e5;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🗂️ Gerenciador de Arquivos</h1>
+            <p>Visualize e gerencie os arquivos enviados para o sistema</p>
+        </div>
+        
+        <div class="stats" id="stats">
+            <!-- Estatísticas serão carregadas aqui -->
+        </div>
+        
+        <div class="controls">
+            <select id="typeFilter">
+                <option value="">Todos os tipos</option>
+                <option value="image">Imagens</option>
+                <option value="video">Vídeos</option>
+                <option value="audio">Áudios</option>
+            </select>
+            
+            <button class="btn btn-primary" onclick="loadFiles()">🔄 Atualizar</button>
+            <button class="btn btn-secondary" onclick="loadStats()">📊 Estatísticas</button>
+        </div>
+        
+        <div id="content">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Carregando arquivos...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/v1/media';
+        
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_BASE}/storage/stats`);
+                const stats = await response.json();
+                
+                const statsContainer = document.getElementById('stats');
+                statsContainer.innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-number">${stats.total_files}</div>
+                        <div>Total de Arquivos</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${stats.total_size_mb} MB</div>
+                        <div>Espaço Utilizado</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${stats.by_type.image?.count || 0}</div>
+                        <div>Imagens</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${stats.by_type.video?.count || 0}</div>
+                        <div>Vídeos</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${stats.by_type.audio?.count || 0}</div>
+                        <div>Áudios</div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Erro ao carregar estatísticas:', error);
+            }
+        }
+        
+        async function loadFiles() {
+            const typeFilter = document.getElementById('typeFilter').value;
+            const content = document.getElementById('content');
+            
+            content.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Carregando arquivos...</p>
+                </div>
+            `;
+            
+            try {
+                const url = typeFilter ? 
+                    `${API_BASE}/storage/list?media_type=${typeFilter}` : 
+                    `${API_BASE}/storage/list`;
+                    
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.files.length === 0) {
+                    content.innerHTML = `
+                        <div class="empty-state">
+                            <h3>📁 Nenhum arquivo encontrado</h3>
+                            <p>Faça upload de alguns arquivos para vê-los aqui</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                const filesGrid = data.files.map(file => `
+                    <div class="file-card">
+                        <div class="file-type type-${file.media_type}">${file.media_type}</div>
+                        <div class="file-name">${file.filename}</div>
+                        <div class="file-info">
+                            <div>📦 ${file.size_mb} MB</div>
+                            <div>📅 ${new Date(file.created_at * 1000).toLocaleString('pt-BR')}</div>
+                            <div>🆔 ${file.media_id}</div>
+                        </div>
+                        <div class="file-actions">
+                            <button class="btn btn-primary btn-small" onclick="downloadFile('${file.media_id}')">
+                                ⬇️ Download
+                            </button>
+                            <button class="btn btn-secondary btn-small" onclick="copyId('${file.media_id}')">
+                                📋 Copiar ID
+                            </button>
+                            <button class="btn btn-danger btn-small" onclick="deleteFile('${file.media_id}')">
+                                🗑️ Deletar
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+                
+                content.innerHTML = `
+                    <div class="files-grid">
+                        ${filesGrid}
+                    </div>
+                `;
+                
+            } catch (error) {
+                content.innerHTML = `
+                    <div class="empty-state">
+                        <h3>❌ Erro ao carregar arquivos</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function downloadFile(mediaId) {
+            window.open(`${API_BASE}/storage/${mediaId}`, '_blank');
+        }
+        
+        async function copyId(mediaId) {
+            try {
+                await navigator.clipboard.writeText(mediaId);
+                alert('ID copiado para a área de transferência!');
+            } catch (error) {
+                prompt('Copie este ID:', mediaId);
+            }
+        }
+        
+        async function deleteFile(mediaId) {
+            if (!confirm(`Tem certeza que deseja deletar ${mediaId}?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/storage/${mediaId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    alert('Arquivo deletado com sucesso!');
+                    loadFiles();
+                    loadStats();
+                } else {
+                    alert('Erro ao deletar arquivo');
+                }
+            } catch (error) {
+                alert('Erro ao deletar arquivo: ' + error.message);
+            }
+        }
+        
+        // Event listeners
+        document.getElementById('typeFilter').addEventListener('change', loadFiles);
+        
+        // Carregar dados iniciais
+        loadStats();
+        loadFiles();
+    </script>
+</body>
+</html> 

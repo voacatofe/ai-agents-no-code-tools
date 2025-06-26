@@ -407,18 +407,34 @@ def generate_captioned_video(
                 media_type="audio", file_extension=".wav"
             )
             tmp_file_ids.append(tts_audio_id)
-            captions = ttsManager.kokoro(
+            
+            # Gera o áudio TTS
+            tts_captions = ttsManager.kokoro(
                 text=text,
                 output_path=audio_path,
                 voice=kokoro_voice,
                 speed=kokoro_speed,
             )[0]
+            
+            # Log para debug das legendas do TTS
+            logger.debug(f"Captions retornadas pelo TTS: {len(tts_captions) if tts_captions else 0} itens")
+            
+            # Para português, sempre usar Whisper STT pois Kokoro não retorna timestamps corretos
+            from video.tts import LANGUAGE_VOICE_MAP
+            lang_info = LANGUAGE_VOICE_MAP.get(kokoro_voice, {})
+            is_portuguese = lang_info.get("lang_code") == "p"
+            
+            if is_portuguese or not tts_captions:
+                logger.debug("Usando Whisper STT para gerar legendas (idioma português ou TTS sem timestamps)")
+                stt = STT(model_size="tiny")
+                whisper_language = "pt" if is_portuguese else "en"
+                captions = stt.transcribe(audio_path=audio_path, language=whisper_language)[0]
+                logger.debug(f"Captions geradas pelo Whisper STT: {len(captions) if captions else 0} itens")
+            else:
+                captions = tts_captions
+                logger.debug("Usando captions do TTS")
+                
         builder.set_audio(audio_path)
-
-        # Log para debug das legendas
-        logger.debug(f"Captions retornadas pelo TTS: {len(captions) if captions else 0} itens")
-        if captions and len(captions) > 0:
-            logger.debug(f"Exemplo de caption: {captions[0]}")
 
         # create subtitle
         captionsManager = Caption()
@@ -428,17 +444,23 @@ def generate_captioned_video(
         tmp_file_ids.append(subtitle_id)
         segments = captionsManager.create_subtitle_segments_english(
             captions=captions,
-            lines=1,
-            max_length=1,
+            lines=2,
+            max_length=40,
         )
+        logger.debug(f"Segmentos de legenda criados: {len(segments) if segments else 0}")
+        if segments and len(segments) > 0:
+            logger.debug(f"Exemplo de segmento: {segments[0]}")
+            
         captionsManager.create_subtitle(
             segments=segments,
-            font_size=120,
+            font_size=80,
             output_path=subtitle_path,
             dimensions=dimensions,
-            shadow_blur=10,
-            stroke_size=5,
+            shadow_blur=3,
+            stroke_size=3,
+            position_from_top=0.8,
         )
+        logger.debug(f"Arquivo de legenda criado em: {subtitle_path}")
         builder.set_captions(
             file_path=subtitle_path,
         )

@@ -116,9 +116,14 @@ class Storage:
         ):
             raise ValueError("Custom name contains invalid characters")
 
-        # SEMPRE gerar filename único para segurança, independente do nome customizado
-        asset_id = str(uuid.uuid4())
-        filename = f"{asset_id}{file_extension}" if file_extension else asset_id
+        # Usar nome customizado se fornecido, senão gerar UUID único
+        if custom_name:
+            # Sanificar nome customizado para segurança
+            safe_name = self._sanitize_filename(custom_name)
+            filename = f"{safe_name}{file_extension}" if file_extension else safe_name
+        else:
+            asset_id = str(uuid.uuid4())
+            filename = f"{asset_id}{file_extension}" if file_extension else asset_id
             
         file_path = os.path.join(self.storage_path, media_type, filename)
 
@@ -242,9 +247,14 @@ class Storage:
         ):
             raise ValueError("Custom name contains invalid characters")
 
-        # SEMPRE gerar ID único para segurança, independente do nome customizado
-        asset_id = str(uuid.uuid4())
-        filename = f"{asset_id}{file_extension}" if file_extension else asset_id
+        # Usar nome customizado se fornecido, senão gerar UUID único
+        if custom_name:
+            # Sanificar nome customizado para segurança
+            safe_name = self._sanitize_filename(custom_name)
+            filename = f"{safe_name}{file_extension}" if file_extension else safe_name
+        else:
+            asset_id = str(uuid.uuid4())
+            filename = f"{asset_id}{file_extension}" if file_extension else asset_id
             
         return f"{media_type}_{filename}"
 
@@ -369,20 +379,31 @@ class Storage:
         ):
             raise ValueError("Invalid folder path")
         
-        # SEMPRE gerar filename único para segurança, independente do nome customizado  
+        # Usar nome customizado se fornecido, senão gerar UUID único
+        if custom_name:
+            # Sanificar nome customizado para segurança
+            safe_name = self._sanitize_filename(custom_name)
+            filename = f"{safe_name}{file_extension}" if file_extension else safe_name
+        else:
+            asset_id = str(uuid.uuid4())
+            filename = f"{asset_id}{file_extension}" if file_extension else asset_id
+        
+        # Gerar media_id sempre seguro (diferente do filename)
         asset_id = str(uuid.uuid4())
-        filename = f"{asset_id}{file_extension}" if file_extension else asset_id
+        safe_filename = f"{asset_id}{file_extension}" if file_extension else asset_id
         
         # Determine file path
         if folder_path:
             # Create folder if it doesn't exist
             folder_full_path = os.path.join(self.storage_path, "folders", folder_path)
             os.makedirs(folder_full_path, exist_ok=True)
-            file_path = os.path.join(folder_full_path, filename)
-            media_id = f"folder_{folder_path.replace('/', '_')}_{media_type}_{filename}"
+            file_path = os.path.join(folder_full_path, safe_filename)  # Usar safe_filename no sistema de arquivos
+            # Media_ID sempre seguro - substitui espaços e caracteres especiais
+            safe_folder = folder_path.replace('/', '_').replace(' ', '_').replace('\\', '_')
+            media_id = f"folder_{safe_folder}_{media_type}_{safe_filename}"
         else:
-            file_path = os.path.join(self.storage_path, media_type, filename)
-            media_id = f"{media_type}_{filename}"
+            file_path = os.path.join(self.storage_path, media_type, safe_filename)
+            media_id = f"{media_type}_{safe_filename}"
         
         # Security check
         resolved_path = os.path.abspath(file_path)
@@ -718,6 +739,37 @@ class Storage:
         else:
             return MediaType.IMAGE  # fallback
     
+    def _sanitize_filename(self, filename: str) -> str:
+        """
+        Sanifica um nome de arquivo removendo caracteres perigosos.
+        
+        Args:
+            filename (str): Nome original do arquivo
+            
+        Returns:
+            str: Nome sanificado e seguro
+        """
+        import re
+        
+        # Remove caracteres perigosos e mantém apenas letras, números, hífen, underscore e espaços
+        sanitized = re.sub(r'[<>:"/\\|?*]', '', filename)
+        
+        # Substitui múltiplos espaços por um único espaço
+        sanitized = re.sub(r'\s+', ' ', sanitized)
+        
+        # Remove espaços no início e fim
+        sanitized = sanitized.strip()
+        
+        # Se ficou vazio após sanificação, usar UUID
+        if not sanitized:
+            sanitized = str(uuid.uuid4())
+        
+        # Limitar comprimento (máximo 50 caracteres)
+        if len(sanitized) > 50:
+            sanitized = sanitized[:50]
+        
+        return sanitized
+    
 
     
 
@@ -769,7 +821,9 @@ class Storage:
                 
                 # Gerar media_id correto para arquivos em pastas
                 if folder_path:
-                    media_id = f"folder_{folder_path.replace('/', '_')}_{media_type}_{item}"
+                    # Media_ID sempre seguro - substitui espaços e caracteres especiais
+                    safe_folder = folder_path.replace('/', '_').replace(' ', '_').replace('\\', '_')
+                    media_id = f"folder_{safe_folder}_{media_type}_{item}"
                 else:
                     media_id = f"{media_type}_{item}"
                 

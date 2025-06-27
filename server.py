@@ -714,9 +714,15 @@ def generate_captioned_video(
             content={"error": f"Background image with ID {background_id} not found."},
         )
 
-    output_id, output_path = storage.create_media_filename_with_id(
-        media_type="video", file_extension=".mp4", custom_name=name or ""
-    )
+    # Generate video in temp folder
+    import uuid
+    asset_id = str(uuid.uuid4())
+    video_filename = f"{asset_id}.mp4"
+    temp_folder_path = os.path.join(storage.storage_path, "folders", "temp")
+    os.makedirs(temp_folder_path, exist_ok=True)
+    output_path = os.path.join(temp_folder_path, video_filename)
+    output_id = asset_id  # Clean UUID for media ID
+    
     dimensions = (width or 1080, height or 1920)
     builder = VideoBuilder(
         dimensions=dimensions,
@@ -824,6 +830,16 @@ def generate_captioned_video(
         builder.set_output_path(output_path)
 
         builder.execute()
+        
+        # Save metadata for the final video in temp folder
+        if name:  # If custom name was provided
+            storage._save_file_metadata(output_id, {
+                "custom_name": name,
+                "original_filename": name,
+                "media_type": "video",
+                "folder_path": "temp",
+                "file_extension": ".mp4"
+            })
 
         for tmp_file_id in tmp_file_ids:
             if storage.media_exists(tmp_file_id):

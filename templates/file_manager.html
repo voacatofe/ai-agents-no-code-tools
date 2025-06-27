@@ -563,16 +563,13 @@
                     `${API_BASE}/folders/${encodeURIComponent(folderPath)}/contents` : 
                     `${API_BASE}/folders/root/contents`;
                     
-                console.log('🔍 Loading from URL:', folderUrl);
                 const folderResponse = await fetch(folderUrl);
                 
                 if (!folderResponse.ok) {
-                    console.error('❌ Folder response error:', folderResponse.status, folderResponse.statusText);
                     throw new Error(`Failed to load folders: ${folderResponse.status}`);
                 }
                 
                 const folderData = await folderResponse.json();
-                console.log('📁 Folder data received:', folderData);
                 
                 // Load all files (for root view when no folder selected) with type filter
                 let allFiles = [];
@@ -583,14 +580,12 @@
                     const filesResponse = await fetch(filesUrl);
                     const filesData = await filesResponse.json();
                     allFiles = filesData.files || [];
-                    console.log('📄 Files data received:', allFiles);
                 }
                 
                 let contentHtml = '';
                 
                 // Show folders first
                 if (folderData.folders && folderData.folders.length > 0) {
-                    console.log('✅ Found folders:', folderData.folders.length);
                     const foldersGrid = folderData.folders.map(folder => `
                         <div class="folder-card" onclick="navigateToFolder('${folder.path}')">
                             <div class="folder-icon">📁</div>
@@ -608,8 +603,6 @@
                     `).join('');
                     
                     contentHtml += `<div class="files-grid">${foldersGrid}</div>`;
-                } else {
-                    console.log('❌ No folders found or folderData.folders is empty');
                 }
                 
                 // Show files in current folder or all files if in root

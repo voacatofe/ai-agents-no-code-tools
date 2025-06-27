@@ -534,6 +534,21 @@ def delete_folder(folder_path: str):
         )
 
 
+@v1_media_api_router.get("/folders/root/contents")
+def get_root_folder_contents():
+    """
+    Get contents of the root folder.
+    """
+    try:
+        contents = storage.list_folder_contents("")
+        return contents
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": f"Error getting root folder contents: {str(e)}"}
+        )
+
+
 @v1_media_api_router.get("/folders/{folder_path:path}/contents")
 def get_folder_contents(folder_path: str):
     """
@@ -549,21 +564,6 @@ def get_folder_contents(folder_path: str):
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"error": f"Error getting folder contents: {str(e)}"}
-        )
-
-
-@v1_media_api_router.get("/folders/root/contents")
-def get_root_folder_contents():
-    """
-    Get contents of the root folder.
-    """
-    try:
-        contents = storage.list_folder_contents("")
-        return contents
-    except Exception as e:
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"error": f"Error getting root folder contents: {str(e)}"}
         )
 
 

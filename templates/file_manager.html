@@ -363,6 +363,194 @@
             color: white;
             border-color: #4f46e5;
         }
+        
+        /* Thumbnail Styles */
+        .file-thumbnail {
+            width: 100%;
+            height: 120px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            overflow: hidden;
+            position: relative;
+            background: #f3f4f6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        
+        .file-thumbnail img,
+        .file-thumbnail video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .file-thumbnail-icon {
+            font-size: 3rem;
+            color: #9ca3af;
+        }
+        
+        .file-thumbnail-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        
+        .file-thumbnail:hover .file-thumbnail-overlay {
+            opacity: 1;
+        }
+        
+        .file-thumbnail-play {
+            color: white;
+            font-size: 2rem;
+        }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(5px);
+        }
+        
+        .modal-content {
+            position: relative;
+            background: white;
+            margin: 5% auto;
+            padding: 0;
+            width: 90%;
+            max-width: 800px;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin: 0;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #6b7280;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        
+        .modal-close:hover {
+            background: #f3f4f6;
+            color: #374151;
+        }
+        
+        .modal-body {
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #000;
+        }
+        
+        .modal-media {
+            width: 100%;
+            max-height: 60vh;
+            object-fit: contain;
+        }
+        
+        .modal-info {
+            padding: 20px;
+            background: white;
+            width: 100%;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .modal-info-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .modal-info-label {
+            font-size: 0.8rem;
+            color: #6b7280;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        
+        .modal-info-value {
+            font-weight: 500;
+            word-break: break-all;
+        }
+        
+        .modal-actions {
+            padding: 20px;
+            background: #f9fafb;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        
+        .audio-player {
+            width: 100%;
+            padding: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .audio-player audio {
+            width: 100%;
+            max-width: 400px;
+        }
+        
+        .audio-info {
+            text-align: center;
+            color: white;
+        }
+        
+        .audio-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .audio-details {
+            opacity: 0.8;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
@@ -423,6 +611,27 @@
         </div>
     </div>
 
+    <!-- Preview Modal -->
+    <div id="previewModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">File Preview</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Content will be loaded here -->
+            </div>
+            <div class="modal-info" id="modalInfo">
+                <!-- File info will be loaded here -->
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" id="modalDownload">⬇️ Download</button>
+                <button class="btn btn-secondary" id="modalCopyId">📋 Copy ID</button>
+                <button class="btn btn-danger" id="modalDelete">🗑️ Delete</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_BASE = '/api/v1/media';
         
@@ -432,6 +641,210 @@
         
         // Variáveis globais para sistema de pastas
         let currentFolder = '';
+        
+        // ==================== THUMBNAIL AND PREVIEW FUNCTIONS ====================
+        
+        function generateFileThumbnail(file) {
+            if (!file.media_id) return '';
+            
+            const fileUrl = `${API_BASE}/storage/${file.media_id}`;
+            const mediaType = file.media_type || 'file';
+            
+            let thumbnailContent = '';
+            let overlayContent = '';
+            
+            switch (mediaType) {
+                case 'image':
+                    thumbnailContent = `<img src="${fileUrl}" alt="${file.filename || file.name}" loading="lazy">`;
+                    overlayContent = '<div class="file-thumbnail-play">🔍</div>';
+                    break;
+                    
+                case 'video':
+                    thumbnailContent = `<video src="${fileUrl}" muted preload="metadata"></video>`;
+                    overlayContent = '<div class="file-thumbnail-play">▶️</div>';
+                    break;
+                    
+                case 'audio':
+                    thumbnailContent = '<div class="file-thumbnail-icon">🎵</div>';
+                    overlayContent = '<div class="file-thumbnail-play">▶️</div>';
+                    break;
+                    
+                default:
+                    thumbnailContent = '<div class="file-thumbnail-icon">📄</div>';
+                    overlayContent = '<div class="file-thumbnail-play">👁️</div>';
+            }
+            
+            return `
+                <div class="file-thumbnail" onclick="openPreview('${file.media_id}', '${mediaType}', '${(file.filename || file.name).replace(/'/g, "\\'")}')">
+                    ${thumbnailContent}
+                    <div class="file-thumbnail-overlay">
+                        ${overlayContent}
+                    </div>
+                </div>
+            `;
+        }
+        
+        function openPreview(mediaId, mediaType, filename) {
+            const modal = document.getElementById('previewModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalBody = document.getElementById('modalBody');
+            const modalInfo = document.getElementById('modalInfo');
+            
+            modalTitle.textContent = filename;
+            
+            // Setup action buttons
+            setupModalActions(mediaId, filename);
+            
+            // Generate preview content
+            const fileUrl = `${API_BASE}/storage/${mediaId}`;
+            let previewContent = '';
+            
+            switch (mediaType) {
+                case 'image':
+                    previewContent = `<img src="${fileUrl}" alt="${filename}" class="modal-media">`;
+                    break;
+                    
+                case 'video':
+                    previewContent = `
+                        <video controls class="modal-media" preload="metadata">
+                            <source src="${fileUrl}" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                    `;
+                    break;
+                    
+                case 'audio':
+                    previewContent = `
+                        <div class="audio-player">
+                            <div class="audio-info">
+                                <div class="audio-title">${filename}</div>
+                                <div class="audio-details">Click play to listen</div>
+                            </div>
+                            <audio controls preload="metadata">
+                                <source src="${fileUrl}" type="audio/mpeg">
+                                <source src="${fileUrl}" type="audio/wav">
+                                <source src="${fileUrl}" type="audio/ogg">
+                                Your browser does not support the audio tag.
+                            </audio>
+                        </div>
+                    `;
+                    break;
+                    
+                default:
+                    previewContent = `
+                        <div style="padding: 40px; text-align: center; color: #6b7280;">
+                            <div style="font-size: 4rem; margin-bottom: 20px;">📄</div>
+                            <p>Preview not available for this file type</p>
+                        </div>
+                    `;
+            }
+            
+            modalBody.innerHTML = previewContent;
+            
+            // Load file information
+            loadFileInfo(mediaId);
+            
+            // Show modal
+            modal.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+        
+        function setupModalActions(mediaId, filename) {
+            const downloadBtn = document.getElementById('modalDownload');
+            const copyBtn = document.getElementById('modalCopyId');
+            const deleteBtn = document.getElementById('modalDelete');
+            
+            downloadBtn.onclick = () => downloadFile(mediaId);
+            copyBtn.onclick = () => copyId(mediaId);
+            deleteBtn.onclick = () => {
+                if (confirm(`Are you sure you want to delete "${filename}"?`)) {
+                    deleteFile(mediaId);
+                    closeModal();
+                }
+            };
+        }
+        
+        async function loadFileInfo(mediaId) {
+            const modalInfo = document.getElementById('modalInfo');
+            
+            try {
+                const response = await fetch(`${API_BASE}/storage/${mediaId}/info`);
+                const fileInfo = await response.json();
+                
+                modalInfo.innerHTML = `
+                    <div class="modal-info-item">
+                        <div class="modal-info-label">File Name</div>
+                        <div class="modal-info-value">${fileInfo.filename}</div>
+                    </div>
+                    <div class="modal-info-item">
+                        <div class="modal-info-label">File Size</div>
+                        <div class="modal-info-value">${fileInfo.size_mb} MB</div>
+                    </div>
+                    <div class="modal-info-item">
+                        <div class="modal-info-label">Media Type</div>
+                        <div class="modal-info-value">${fileInfo.media_type.toUpperCase()}</div>
+                    </div>
+                    <div class="modal-info-item">
+                        <div class="modal-info-label">File ID</div>
+                        <div class="modal-info-value">${fileInfo.media_id}</div>
+                    </div>
+                    <div class="modal-info-item">
+                        <div class="modal-info-label">Created</div>
+                        <div class="modal-info-value">${new Date(fileInfo.created_at * 1000).toLocaleString('en-US')}</div>
+                    </div>
+                    <div class="modal-info-item">
+                        <div class="modal-info-label">Modified</div>
+                        <div class="modal-info-value">${new Date(fileInfo.modified_at * 1000).toLocaleString('en-US')}</div>
+                    </div>
+                `;
+            } catch (error) {
+                modalInfo.innerHTML = `
+                    <div class="modal-info-item">
+                        <div class="modal-info-label">Error</div>
+                        <div class="modal-info-value">Could not load file information</div>
+                    </div>
+                `;
+            }
+        }
+        
+        function closeModal() {
+            const modal = document.getElementById('previewModal');
+            const modalBody = document.getElementById('modalBody');
+            
+            // Stop any playing media
+            const videos = modalBody.querySelectorAll('video');
+            const audios = modalBody.querySelectorAll('audio');
+            
+            videos.forEach(video => {
+                video.pause();
+                video.currentTime = 0;
+            });
+            
+            audios.forEach(audio => {
+                audio.pause();
+                audio.currentTime = 0;
+            });
+            
+            modal.style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('previewModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        };
+        
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeModal();
+            }
+        });
+        
+        // ==================== END THUMBNAIL AND PREVIEW FUNCTIONS ====================
         
         function showNotification(message, type = 'success') {
             const notification = document.createElement('div');
@@ -687,6 +1100,7 @@
                 if (filesToShow.length > 0) {
                     const filesGrid = filesToShow.map(file => `
                         <div class="file-card">
+                            ${generateFileThumbnail(file)}
                             <div class="file-type type-${file.media_type || 'file'}">${(file.media_type || 'FILE').toUpperCase()}</div>
                             <div class="file-name">${file.filename || file.name}</div>
                             <div class="file-info">

@@ -1097,18 +1097,31 @@ class Storage:
         if not folder_id:
             return folder_id
             
-        # List all available folders
-        folders = self.list_folders(parent_folder)
+        # Build parent folder path directly to avoid circular dependency
+        if parent_folder:
+            base_path = os.path.join(self.storage_path, "folders", parent_folder)
+        else:
+            base_path = os.path.join(self.storage_path, "folders")
         
-        # Search for exact ID
-        for folder in folders:
-            if folder.get("id") == folder_id:
-                return folder["name"]
-        
-        # If not found by ID, try by name (compatibility)
-        for folder in folders:
-            if folder["name"] == folder_id:
-                return folder["name"]
+        # If base path doesn't exist, return the folder_id as is
+        if not os.path.exists(base_path):
+            return folder_id
+            
+        try:
+            # List folders directly from filesystem to avoid circular dependency with list_folders
+            for item in os.listdir(base_path):
+                item_path = os.path.join(base_path, item)
+                if os.path.isdir(item_path):
+                    # Check if this folder's normalized ID matches what we're looking for
+                    normalized_id = self._normalize_folder_name(item)
+                    if normalized_id == folder_id:
+                        return item
+                    # Also check direct name match for compatibility
+                    if item == folder_id:
+                        return item
+        except Exception:
+            # If any error occurs, just return the folder_id as is
+            pass
         
         # If not found, return folder_id itself (might be a valid name)
         return folder_id

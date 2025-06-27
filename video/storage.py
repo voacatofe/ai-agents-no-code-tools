@@ -341,6 +341,75 @@ class Storage:
         file_extension = os.path.splitext(url)[1]
         return self.upload_media(media_type, response.content, file_extension)
     
+    def upload_media_to_folder(self, media_type: str, media_data: bytes, 
+                              file_extension: str = "", folder_path: str = "", custom_name: str = "") -> str:
+        """
+        Upload media to a specific folder.
+        
+        Args:
+            media_type (str): Type of media
+            media_data (bytes): Binary data of the file
+            file_extension (str): File extension
+            folder_path (str): Target folder path
+            custom_name (str): Custom name for the file
+            
+        Returns:
+            str: Media ID of the created file
+        """
+        # Validate media type
+        valid_types = [MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO, MediaType.TMP]
+        if media_type not in valid_types:
+            raise ValueError(f"Invalid media type: {media_type}")
+        
+        # Validate extension
+        if file_extension and (
+            ".." in file_extension or "/" in file_extension or "\\" in file_extension
+        ):
+            raise ValueError("File extension contains invalid characters")
+        
+        # Validate custom name
+        if custom_name and (
+            ".." in custom_name or "/" in custom_name or "\\" in custom_name
+        ):
+            raise ValueError("Custom name contains invalid characters")
+        
+        # Validate folder path
+        if folder_path and (
+            ".." in folder_path or folder_path.startswith("/") or folder_path.startswith("\\")
+        ):
+            raise ValueError("Invalid folder path")
+        
+        # Generate filename
+        if custom_name:
+            name_without_ext = os.path.splitext(custom_name)[0]
+            filename = f"{name_without_ext}{file_extension}" if file_extension else name_without_ext
+        else:
+            asset_id = str(uuid.uuid4())
+            filename = f"{asset_id}{file_extension}" if file_extension else asset_id
+        
+        # Determine file path
+        if folder_path:
+            # Create folder if it doesn't exist
+            folder_full_path = os.path.join(self.storage_path, "folders", folder_path)
+            os.makedirs(folder_full_path, exist_ok=True)
+            file_path = os.path.join(folder_full_path, filename)
+            media_id = f"folder_{folder_path.replace('/', '_')}_{media_type}_{filename}"
+        else:
+            file_path = os.path.join(self.storage_path, media_type, filename)
+            media_id = f"{media_type}_{filename}"
+        
+        # Security check
+        resolved_path = os.path.abspath(file_path)
+        storage_abs_path = os.path.abspath(self.storage_path)
+        if not resolved_path.startswith(storage_abs_path):
+            raise ValueError("Path traversal attempt detected")
+        
+        # Write file
+        with open(file_path, "wb") as f:
+            f.write(media_data)
+        
+        return media_id
+    
     def list_media(self, media_type: str = None) -> list:
         """
         Lista todos os arquivos de mídia armazenados.

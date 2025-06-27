@@ -230,8 +230,10 @@ def generate_chatterbox_tts(
     return {"file_id": audio_id}
 
 
+@v1_media_api_router.post("/storage/{folder_path:path}")
 @v1_media_api_router.post("/storage")
 def upload_file(
+    folder_path: Optional[str] = None,
     file: Optional[UploadFile] = File(None, description="File to upload"),
     url: Optional[str] = Form(None, description="URL of the file to upload (optional)"),
     media_type: Literal["image", "video", "audio"] = Form(
@@ -241,6 +243,9 @@ def upload_file(
 ):
     """
     Upload a file and return its ID.
+    
+    Args:
+        folder_path: Target folder path (e.g., 'temp', 'Background Music'). Optional - if not provided, saves to default media folders.
     """
     if media_type not in ["image", "video", "audio"]:
         return JSONResponse(
@@ -248,12 +253,21 @@ def upload_file(
             content={"error": f"Invalid media type: {media_type}"},
         )
     if file:
-        file_id = storage.upload_media(
-            media_type=media_type,
-            media_data=file.file.read(),
-            file_extension=os.path.splitext(file.filename)[1],
-            custom_name=name
-        )
+        if folder_path:
+            file_id = storage.upload_media_to_folder(
+                media_type=media_type,
+                media_data=file.file.read(),
+                file_extension=os.path.splitext(file.filename)[1],
+                folder_path=folder_path,
+                custom_name=name
+            )
+        else:
+            file_id = storage.upload_media(
+                media_type=media_type,
+                media_data=file.file.read(),
+                file_extension=os.path.splitext(file.filename)[1],
+                custom_name=name
+            )
 
         return {"file_id": file_id}
     elif url:
@@ -272,14 +286,40 @@ def upload_file(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     content={"error": f"Failed to download media from {url}"}
                 )
-            file_id = storage.upload_media(
-                media_type=media_type,
-                media_data=response.content,
-                file_extension=file_extension,
-                custom_name=name
-            )
+            if folder_path:
+                file_id = storage.upload_media_to_folder(
+                    media_type=media_type,
+                    media_data=response.content,
+                    file_extension=file_extension,
+                    folder_path=folder_path,
+                    custom_name=name
+                )
+            else:
+                file_id = storage.upload_media(
+                    media_type=media_type,
+                    media_data=response.content,
+                    file_extension=file_extension,
+                    custom_name=name
+                )
         else:
-            file_id = storage.upload_media_from_url(media_type=media_type, url=url)
+            # For URL without custom name
+            if folder_path:
+                import requests
+                response = requests.get(url)
+                if response.status_code != 200:
+                    return JSONResponse(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        content={"error": f"Failed to download media from {url}"}
+                    )
+                file_extension = os.path.splitext(url)[1]
+                file_id = storage.upload_media_to_folder(
+                    media_type=media_type,
+                    media_data=response.content,
+                    file_extension=file_extension,
+                    folder_path=folder_path
+                )
+            else:
+                file_id = storage.upload_media_from_url(media_type=media_type, url=url)
         return {"file_id": file_id}
 
 
@@ -347,17 +387,34 @@ def get_file_info(file_id: str):
         )
 
 
+@v1_media_api_router.get("/storage/{folder_path:path}/{file_id}/status")
 @v1_media_api_router.get("/storage/{file_id}/status")
-def file_status(file_id: str):
+def file_status(file_id: str, folder_path: Optional[str] = None):
     """
     Check the status of a file by its ID.
+    
+    Args:
+        file_id: File ID to check status
+        folder_path: Folder path where the file should be (optional)
     """
-    tmp_id = storage.create_tmp_file_id(file_id)
+    if folder_path:
+        # For files in folders, construct the expected media_id format
+        if not file_id.startswith("folder_"):
+            # If file_id doesn't have folder prefix, construct it
+            folder_clean = folder_path.replace('/', '_')
+            expected_file_id = f"folder_{folder_clean}_{file_id}"
+        else:
+            expected_file_id = file_id
+    else:
+        # For files in default media folders
+        expected_file_id = file_id
+    
+    tmp_id = storage.create_tmp_file_id(expected_file_id)
     if storage.media_exists(tmp_id):
-        return {"status": "processing"}
-    elif storage.media_exists(file_id):
-        return {"status": "ready"}
-    return {"status": "not_found"}
+        return {"status": "processing", "file_id": expected_file_id}
+    elif storage.media_exists(expected_file_id):
+        return {"status": "ready", "file_id": expected_file_id}
+    return {"status": "not_found", "file_id": expected_file_id}
 
 
 @v1_media_api_router.get("/storage/{file_id}")

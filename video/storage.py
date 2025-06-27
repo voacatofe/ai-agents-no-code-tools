@@ -546,33 +546,72 @@ class Storage:
     def get_media_info(self, media_id: str) -> dict:
         """
         Gets detailed information about a specific file.
+        Works with files in folders and default media directories.
         
         Args:
-            media_id (str): File ID
+            media_id (str): File ID (UUID or media_type_filename)
             
         Returns:
             dict: Detailed file information
         """
-        file_path = self._get_safe_file_path(media_id)
-        
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"Media file {media_id} not found.")
+        try:
+            file_path, file_info = self._find_file_by_uuid_anywhere(media_id)
             
-        stat = os.stat(file_path)
-        media_type, filename = self._validate_media_id(media_id)
-        
-        return {
-            "media_id": media_id,
-            "media_type": media_type,
-            "filename": filename,
-            "file_path": file_path,
-            "size_bytes": stat.st_size,
-            "size_mb": round(stat.st_size / (1024 * 1024), 2),
-            "created_at": stat.st_ctime,
-            "modified_at": stat.st_mtime,
-            "file_extension": os.path.splitext(filename)[1].lower(),
-            "exists": True
-        }
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"Media file {media_id} not found.")
+                
+            stat = os.stat(file_path)
+            
+            # Prepare display name
+            display_name = file_info["filename"]
+            if file_info["custom_name"]:
+                display_name = f"{file_info['custom_name']}{file_info['file_extension']}"
+            
+            return {
+                "media_id": file_info["media_id"],
+                "media_type": file_info["media_type"],
+                "filename": display_name,
+                "original_filename": file_info["filename"],
+                "file_path": file_path,
+                "folder_path": file_info["folder_path"],
+                "size_bytes": stat.st_size,
+                "size_mb": round(stat.st_size / (1024 * 1024), 2),
+                "created_at": stat.st_ctime,
+                "modified_at": stat.st_mtime,
+                "file_extension": file_info["file_extension"],
+                "custom_name": file_info["custom_name"],
+                "is_in_folder": file_info["is_in_folder"],
+                "exists": True
+            }
+        except FileNotFoundError:
+            # Fallback to old method for compatibility
+            try:
+                file_path = self._get_safe_file_path(media_id)
+                
+                if not os.path.exists(file_path):
+                    raise FileNotFoundError(f"Media file {media_id} not found.")
+                    
+                stat = os.stat(file_path)
+                media_type, filename = self._validate_media_id(media_id)
+                
+                return {
+                    "media_id": media_id,
+                    "media_type": media_type,
+                    "filename": filename,
+                    "original_filename": filename,
+                    "file_path": file_path,
+                    "folder_path": "",
+                    "size_bytes": stat.st_size,
+                    "size_mb": round(stat.st_size / (1024 * 1024), 2),
+                    "created_at": stat.st_ctime,
+                    "modified_at": stat.st_mtime,
+                    "file_extension": os.path.splitext(filename)[1].lower(),
+                    "custom_name": "",
+                    "is_in_folder": False,
+                    "exists": True
+                }
+            except Exception:
+                raise FileNotFoundError(f"Media file {media_id} not found.")
     
     def get_storage_stats(self) -> dict:
         """
@@ -1125,3 +1164,79 @@ class Storage:
         
         # If not found, return folder_id itself (might be a valid name)
         return folder_id
+
+    def _find_file_by_uuid_anywhere(self, media_id: str) -> tuple[str, dict]:
+        """
+        Finds a file by UUID in any location (folders or default media directories).
+        
+        Args:
+            media_id (str): Clean UUID or media ID
+            
+        Returns:
+            tuple: (file_path, metadata_dict) where metadata includes folder info
+        """
+        # Clean the media_id - remove any prefixes to get just the UUID
+        clean_uuid = media_id
+        if "_" in media_id:
+            # For old format media_type_uuid, extract the UUID part
+            parts = media_id.split("_", 1)
+            if len(parts) > 1:
+                clean_uuid = parts[1]
+                # Remove file extension if present
+                if "." in clean_uuid:
+                    clean_uuid = clean_uuid.split(".")[0]
+        
+        # First, try to find in folders
+        folders_path = os.path.join(self.storage_path, "folders")
+        if os.path.exists(folders_path):
+            for root, dirs, files in os.walk(folders_path):
+                for file in files:
+                    # Extract UUID from filename (format: uuid.ext)
+                    file_uuid = os.path.splitext(file)[0]
+                    if file_uuid == clean_uuid:
+                        file_path = os.path.join(root, file)
+                        # Determine folder path relative to folders directory
+                        relative_folder = os.path.relpath(root, folders_path)
+                        if relative_folder == ".":
+                            relative_folder = ""
+                        
+                        # Get file extension and detect media type
+                        file_ext = os.path.splitext(file)[1].lower()
+                        media_type = self._detect_media_type_from_extension(file_ext)
+                        
+                        # Get metadata if exists
+                        metadata = self._get_file_metadata(clean_uuid)
+                        
+                        return file_path, {
+                            "media_id": clean_uuid,
+                            "filename": file,
+                            "media_type": media_type,
+                            "folder_path": relative_folder,
+                            "file_extension": file_ext,
+                            "custom_name": metadata.get("custom_name", ""),
+                            "is_in_folder": True
+                        }
+        
+        # If not found in folders, try default media directories
+        for media_type in [MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO, MediaType.TMP]:
+            media_path = os.path.join(self.storage_path, media_type)
+            if os.path.exists(media_path):
+                for file in os.listdir(media_path):
+                    if file.startswith('.'):
+                        continue
+                    file_path = os.path.join(media_path, file)
+                    if os.path.isfile(file_path):
+                        # For old format: media_type_uuid.ext
+                        if file.startswith(clean_uuid) or clean_uuid in file:
+                            file_ext = os.path.splitext(file)[1].lower()
+                            return file_path, {
+                                "media_id": media_id,  # Keep original format for compatibility
+                                "filename": file,
+                                "media_type": media_type,
+                                "folder_path": "",
+                                "file_extension": file_ext,
+                                "custom_name": "",
+                                "is_in_folder": False
+                            }
+        
+        raise FileNotFoundError(f"File with UUID {clean_uuid} not found anywhere")

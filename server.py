@@ -395,28 +395,31 @@ def get_file_info(file_id: str):
 def file_status(file_id: str, folder_path: Optional[str] = None):
     """
     Check the status of a file by its ID.
+    Works with UUID-only files in folders and old format files.
     
     Args:
         file_id: File ID to check status
         folder_path: Folder path where the file should be (optional)
     """
+    # For files in folders, use the UUID directly (new system)
+    # The folder_path is just for organization in the URL, actual files use UUID-only IDs
     if folder_path:
-        # For files in folders, construct the expected media_id format
-        if not file_id.startswith("folder_"):
-            # If file_id doesn't have folder prefix, construct it
-            folder_clean = folder_path.replace('/', '_')
-            expected_file_id = f"folder_{folder_clean}_{file_id}"
-        else:
-            expected_file_id = file_id
+        # Files in folders use clean UUIDs, not prefixed format
+        expected_file_id = file_id
     else:
-        # For files in default media folders
+        # For files in default media folders, use the file_id as is
         expected_file_id = file_id
     
+    # Check if temporary file exists (processing)
     tmp_id = storage.create_tmp_file_id(expected_file_id)
     if storage.media_exists(tmp_id):
         return {"status": "processing", "file_id": expected_file_id}
+    
+    # Check if final file exists (ready)
     elif storage.media_exists(expected_file_id):
         return {"status": "ready", "file_id": expected_file_id}
+    
+    # File not found
     return {"status": "not_found", "file_id": expected_file_id}
 
 
@@ -446,19 +449,19 @@ def download_file(file_id: str):
 def delete_file(file_id: str, folder_path: Optional[str] = None):
     """
     Delete a file by its ID.
+    Works with UUID-only files in folders and old format files.
     
     Args:
         file_id: File ID to delete
         folder_path: Folder path where the file is located (optional)
     """
+    # For files in folders, use the UUID directly (new system)
+    # The folder_path is just for organization in the URL, actual files use UUID-only IDs
     if folder_path:
-        # For files in folders, construct the expected media_id format
-        if not file_id.startswith("folder_"):
-            folder_clean = folder_path.replace('/', '_')
-            expected_file_id = f"folder_{folder_clean}_{file_id}"
-        else:
-            expected_file_id = file_id
+        # Files in folders use clean UUIDs, not prefixed format
+        expected_file_id = file_id
     else:
+        # For files in default media folders, use the file_id as is
         expected_file_id = file_id
     
     if storage.media_exists(expected_file_id):
@@ -762,7 +765,7 @@ def generate_captioned_video(
             temp_folder_path = os.path.join(storage.storage_path, "folders", "temp")
             os.makedirs(temp_folder_path, exist_ok=True)
             audio_path = os.path.join(temp_folder_path, filename)
-            tts_audio_id = f"folder_temp_audio_{filename}"
+            tts_audio_id = asset_id  # Use clean UUID for temp audio file
             tmp_file_ids.append(tts_audio_id)
             
             # Generate TTS audio
@@ -799,7 +802,7 @@ def generate_captioned_video(
         subtitle_asset_id = str(uuid.uuid4())
         subtitle_filename = f"{subtitle_asset_id}.ass"
         subtitle_path = os.path.join(temp_folder_path, subtitle_filename)
-        subtitle_id = f"folder_temp_tmp_{subtitle_filename}"
+        subtitle_id = subtitle_asset_id  # Use clean UUID for temp subtitle file
         tmp_file_ids.append(subtitle_id)
         segments = captionsManager.create_subtitle_segments_english(
             captions=captions if isinstance(captions, list) else [],

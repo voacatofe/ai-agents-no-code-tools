@@ -66,7 +66,7 @@ class Storage:
     def _get_safe_file_path(self, media_id: str) -> str:
         """
         Gets a safe file path for the given media ID after validation.
-        Funciona com o novo sistema (UUID + metadados) e mantém compatibilidade com formato antigo.
+        Works with UUID files in folders and maintains compatibility with old format.
 
         Args:
             media_id (str): Media ID to get path for
@@ -74,17 +74,27 @@ class Storage:
         Returns:
             str: Safe file path
         """
-        # Try new system first (UUID + metadata)
-        file_path = self._find_file_by_uuid(media_id)
-        if file_path and os.path.exists(file_path):
-            return file_path
+        # Handle temporary files (UUID + .tmp)
+        if media_id.endswith('.tmp'):
+            base_uuid = media_id[:-4]  # Remove .tmp
+            tmp_filename = f"{base_uuid}.tmp"
+            tmp_path = os.path.join(self.storage_path, MediaType.TMP, tmp_filename)
+            return tmp_path
         
-        # Fallback para sistema antigo (compatibilidade)
+        # Try new system first (UUID + metadata for existing files)
+        try:
+            file_path, file_info = self._find_file_by_uuid_anywhere(media_id)
+            if file_path and os.path.exists(file_path):
+                return file_path
+        except FileNotFoundError:
+            pass
+        
+        # Fallback to old system for compatibility
         try:
             media_type, filename = self._validate_media_id(media_id)
             file_path = os.path.join(self.storage_path, media_type, filename)
 
-            # Double-check that the resolved path is within the storage directory
+            # Security check
             resolved_path = os.path.abspath(file_path)
             storage_abs_path = os.path.abspath(self.storage_path)
 
@@ -93,8 +103,12 @@ class Storage:
 
             return file_path
         except:
+            # For UUID-only files that don't exist yet, create path in video folder by default
+            if len(media_id) == 36 and media_id.count('-') == 4:  # Standard UUID format
+                return os.path.join(self.storage_path, MediaType.VIDEO, f"{media_id}.mp4")
+            
             raise FileNotFoundError(f"Media file {media_id} not found.")
-    
+
     def _find_file_by_uuid(self, media_id: str) -> str:
         """
         Locates file by UUID in all folders (new system).
@@ -233,9 +247,10 @@ class Storage:
     def media_exists(self, media_id: str) -> bool:
         """
         Checks if media exists by ID.
+        Works with UUID files in folders and temporary files.
 
         Args:
-            media_id (str): Media ID, e.g., 'image_12345.jpg' or 'video_67890.mp4'.
+            media_id (str): Media ID to check.
 
         Returns:
             bool: True if media exists, False otherwise.
@@ -243,7 +258,7 @@ class Storage:
         try:
             file_path = self._get_safe_file_path(media_id)
             return os.path.exists(file_path)
-        except ValueError:
+        except (ValueError, FileNotFoundError):
             return False
 
     def get_media_path(self, media_id: str) -> str:
@@ -332,6 +347,7 @@ class Storage:
     def create_tmp_file(self, media_id: str) -> str:
         """
         Creates a temporary file for media upload.
+        Works with both UUID-only and old format media IDs.
 
         Args:
             media_id (str): Media ID to create a temporary file for.
@@ -340,7 +356,13 @@ class Storage:
             str: Temporary media ID.
         """
         tmp_id = f"{media_id}.tmp"
-        tmp_path = self.get_media_path(tmp_id)
+        
+        # Create temporary file directly in tmp folder
+        tmp_filename = f"{media_id}.tmp"
+        tmp_path = os.path.join(self.storage_path, MediaType.TMP, tmp_filename)
+        
+        # Ensure tmp directory exists
+        os.makedirs(os.path.dirname(tmp_path), exist_ok=True)
 
         with open(tmp_path, "wb") as f:
             pass

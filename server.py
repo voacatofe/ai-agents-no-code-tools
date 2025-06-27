@@ -48,6 +48,43 @@ def read_root():
     return {"status": "ok"}
 
 
+@app.get("/debug/folders")
+def debug_folders():
+    """
+    Debug endpoint to check folder structure and force creation if needed.
+    """
+    try:
+        # Force create default folders
+        storage._create_default_folders()
+        
+        # Get folder info
+        folders = storage.list_folders()
+        root_contents = storage.list_folder_contents("")
+        
+        # Check filesystem paths
+        import os
+        storage_abs_path = os.path.abspath(storage.storage_path)
+        folders_path = os.path.join(storage.storage_path, "folders")
+        
+        return {
+            "storage_path": storage_abs_path,
+            "folders_path": folders_path,
+            "folders_path_exists": os.path.exists(folders_path),
+            "storage_folders": folders,
+            "root_contents": root_contents,
+            "folder_structure": {
+                folder: os.listdir(os.path.join(folders_path, folder))
+                if os.path.exists(os.path.join(folders_path, folder)) else "NOT_EXISTS"
+                for folder in ["temp", "Background Music"]
+            }
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "traceback": str(e.__traceback__)
+        }
+
+
 @app.get("/files", response_class=HTMLResponse)
 def file_manager():
     """

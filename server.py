@@ -602,7 +602,7 @@ def merge_videos(
         )
 
     merged_video_id, merged_video_path = storage.create_media_filename_with_id(
-        media_type="video", file_extension=".mp4", custom_name=name
+        media_type="video", file_extension=".mp4", custom_name=name or ""
     )
 
     video_paths = []
@@ -633,8 +633,8 @@ def merge_videos(
         utils.merge_videos(
             video_paths=video_paths,
             output_path=merged_video_path,
-            background_music_path=background_music_path,
-            background_music_volume=background_music_volume,
+            background_music_path=background_music_path or "",
+            background_music_volume=background_music_volume or 0.5,
         )
         storage.delete_media(temp_file_id)
 
@@ -691,9 +691,9 @@ def generate_captioned_video(
         )
 
     output_id, output_path = storage.create_media_filename_with_id(
-        media_type="video", file_extension=".mp4", custom_name=name
+        media_type="video", file_extension=".mp4", custom_name=name or ""
     )
-    dimensions = (width, height)
+    dimensions = (width or 1080, height or 1920)
     builder = VideoBuilder(
         dimensions=dimensions,
     )
@@ -737,10 +737,10 @@ def generate_captioned_video(
             
             # Gera o áudio TTS
             tts_captions = ttsManager.kokoro(
-                text=text,
+                text=text or "",
                 output_path=audio_path,
-                voice=kokoro_voice,
-                speed=kokoro_speed,
+                voice=kokoro_voice or "",
+                speed=int(kokoro_speed or 1),
             )[0]
             
             # Log para debug das legendas do TTS
@@ -772,7 +772,7 @@ def generate_captioned_video(
         subtitle_id = f"folder_temp_tmp_{subtitle_filename}"
         tmp_file_ids.append(subtitle_id)
         segments = captionsManager.create_subtitle_segments_english(
-            captions=captions,
+            captions=captions if isinstance(captions, list) else [],
             lines=1,
             max_length=1,
         )

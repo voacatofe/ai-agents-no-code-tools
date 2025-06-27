@@ -66,6 +66,7 @@ class Storage:
     def _get_safe_file_path(self, media_id: str) -> str:
         """
         Gets a safe file path for the given media ID after validation.
+        Funciona com o novo sistema (UUID + metadados) e mantém compatibilidade com formato antigo.
 
         Args:
             media_id (str): Media ID to get path for
@@ -73,17 +74,73 @@ class Storage:
         Returns:
             str: Safe file path
         """
-        media_type, filename = self._validate_media_id(media_id)
-        file_path = os.path.join(self.storage_path, media_type, filename)
+        # Tentar novo sistema primeiro (UUID + metadados)
+        file_path = self._find_file_by_uuid(media_id)
+        if file_path and os.path.exists(file_path):
+            return file_path
+        
+        # Fallback para sistema antigo (compatibilidade)
+        try:
+            media_type, filename = self._validate_media_id(media_id)
+            file_path = os.path.join(self.storage_path, media_type, filename)
 
-        # Double-check that the resolved path is within the storage directory
-        resolved_path = os.path.abspath(file_path)
-        storage_abs_path = os.path.abspath(self.storage_path)
+            # Double-check that the resolved path is within the storage directory
+            resolved_path = os.path.abspath(file_path)
+            storage_abs_path = os.path.abspath(self.storage_path)
 
-        if not resolved_path.startswith(storage_abs_path):
-            raise ValueError("Path traversal attempt detected")
+            if not resolved_path.startswith(storage_abs_path):
+                raise ValueError("Path traversal attempt detected")
 
-        return file_path
+            return file_path
+        except:
+            raise FileNotFoundError(f"Media file {media_id} not found.")
+    
+    def _find_file_by_uuid(self, media_id: str) -> str:
+        """
+        Localiza arquivo pelo UUID em todas as pastas (novo sistema).
+        
+        Args:
+            media_id (str): UUID do arquivo
+            
+        Returns:
+            str: Caminho do arquivo ou string vazia se não encontrado
+        """
+        # Buscar metadados primeiro
+        metadata = self._get_file_metadata(media_id)
+        folder_path = metadata.get("folder_path", "")
+        file_extension = metadata.get("file_extension", "")
+        
+        # Construir possível nome de arquivo
+        filename = f"{media_id}{file_extension}" if file_extension else media_id
+        
+        # Tentar localizar em pasta específica
+        if folder_path:
+            file_path = os.path.join(self.storage_path, "folders", folder_path, filename)
+            if os.path.exists(file_path):
+                return file_path
+        
+        # Tentar localizar em todas as pastas possíveis
+        search_paths = [
+            os.path.join(self.storage_path, "folders"),  # Pastas personalizadas
+            os.path.join(self.storage_path, "image"),    # Pasta padrão image
+            os.path.join(self.storage_path, "video"),    # Pasta padrão video
+            os.path.join(self.storage_path, "audio"),    # Pasta padrão audio
+            os.path.join(self.storage_path, "tmp"),      # Pasta padrão tmp
+        ]
+        
+        for base_path in search_paths:
+            if not os.path.exists(base_path):
+                continue
+                
+            # Buscar arquivo recursivamente
+            for root, dirs, files in os.walk(base_path):
+                # Procurar por arquivo que comece com o UUID
+                for file in files:
+                    if file.startswith(media_id):
+                        file_path = os.path.join(root, file)
+                        return file_path
+        
+        return ""
 
     def upload_media(
         self, media_type: str, media_data: bytes, file_extension: str = "", custom_name: str = ""
@@ -168,6 +225,8 @@ class Storage:
 
         if os.path.exists(file_path):
             os.remove(file_path)
+            # Deletar metadados também
+            self._delete_file_metadata(media_id)
         else:
             raise FileNotFoundError(f"Media file {media_id} not found.")
 
@@ -388,22 +447,19 @@ class Storage:
             asset_id = str(uuid.uuid4())
             filename = f"{asset_id}{file_extension}" if file_extension else asset_id
         
-        # Gerar media_id sempre seguro (diferente do filename)
+        # Gerar media_id simples - apenas UUID
         asset_id = str(uuid.uuid4())
         safe_filename = f"{asset_id}{file_extension}" if file_extension else asset_id
+        media_id = asset_id  # Media ID limpo, sem prefixos
         
         # Determine file path
         if folder_path:
             # Create folder if it doesn't exist
             folder_full_path = os.path.join(self.storage_path, "folders", folder_path)
             os.makedirs(folder_full_path, exist_ok=True)
-            file_path = os.path.join(folder_full_path, safe_filename)  # Usar safe_filename no sistema de arquivos
-            # Media_ID sempre seguro - substitui espaços e caracteres especiais
-            safe_folder = folder_path.replace('/', '_').replace(' ', '_').replace('\\', '_')
-            media_id = f"folder_{safe_folder}_{media_type}_{safe_filename}"
+            file_path = os.path.join(folder_full_path, safe_filename)
         else:
             file_path = os.path.join(self.storage_path, media_type, safe_filename)
-            media_id = f"{media_type}_{safe_filename}"
         
         # Security check
         resolved_path = os.path.abspath(file_path)
@@ -414,6 +470,16 @@ class Storage:
         # Write file
         with open(file_path, "wb") as f:
             f.write(media_data)
+        
+        # Salvar metadados do arquivo (incluindo nome customizado)
+        if custom_name:
+            self._save_file_metadata(media_id, {
+                "custom_name": custom_name,
+                "original_filename": custom_name,
+                "media_type": media_type,
+                "folder_path": folder_path,
+                "file_extension": file_extension
+            })
         
         return media_id
     
@@ -770,6 +836,64 @@ class Storage:
         
         return sanitized
     
+    def _save_file_metadata(self, media_id: str, metadata: dict):
+        """
+        Salva metadados de um arquivo.
+        
+        Args:
+            media_id (str): ID do arquivo
+            metadata (dict): Metadados para salvar
+        """
+        import json
+        
+        metadata_dir = os.path.join(self.storage_path, "metadata")
+        os.makedirs(metadata_dir, exist_ok=True)
+        
+        metadata_file = os.path.join(metadata_dir, f"{media_id}.json")
+        
+        with open(metadata_file, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, ensure_ascii=False, indent=2)
+    
+    def _get_file_metadata(self, media_id: str) -> dict:
+        """
+        Recupera metadados de um arquivo.
+        
+        Args:
+            media_id (str): ID do arquivo
+            
+        Returns:
+            dict: Metadados do arquivo ou dict vazio se não existir
+        """
+        import json
+        
+        metadata_dir = os.path.join(self.storage_path, "metadata")
+        metadata_file = os.path.join(metadata_dir, f"{media_id}.json")
+        
+        if os.path.exists(metadata_file):
+            try:
+                with open(metadata_file, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+        
+        return {}
+    
+    def _delete_file_metadata(self, media_id: str):
+        """
+        Deleta metadados de um arquivo.
+        
+        Args:
+            media_id (str): ID do arquivo
+        """
+        metadata_dir = os.path.join(self.storage_path, "metadata")
+        metadata_file = os.path.join(metadata_dir, f"{media_id}.json")
+        
+        if os.path.exists(metadata_file):
+            try:
+                os.remove(metadata_file)
+            except Exception:
+                pass  # Falha silenciosa se não conseguir deletar metadados
+    
 
     
 
@@ -819,19 +943,23 @@ class Storage:
                 file_ext = os.path.splitext(item)[1].lower()
                 media_type = self._detect_media_type_from_extension(file_ext)
                 
-                # Gerar media_id correto para arquivos em pastas
-                if folder_path:
-                    # Media_ID sempre seguro - substitui espaços e caracteres especiais
-                    safe_folder = folder_path.replace('/', '_').replace(' ', '_').replace('\\', '_')
-                    media_id = f"folder_{safe_folder}_{media_type}_{item}"
-                else:
-                    media_id = f"{media_type}_{item}"
+                # Para arquivos, tentamos encontrar pelo nome UUID  
+                # Extrair UUID do nome do arquivo (formato: uuid.ext)
+                file_uuid = os.path.splitext(item)[0]
+                media_id = file_uuid  # Media ID é sempre o UUID limpo
+                
+                # Buscar metadados para obter nome customizado
+                metadata = self._get_file_metadata(media_id)
+                custom_name = metadata.get("custom_name", "")
+                
+                # Nome para exibição: nome customizado ou UUID se não tiver
+                display_name = f"{custom_name}{file_ext}" if custom_name else item
                 
                 result["files"].append({
                     "media_id": media_id,
                     "media_type": media_type,
-                    "name": item,
-                    "filename": item,
+                    "name": display_name,  # Nome customizado para exibição
+                    "filename": display_name,  # Consistência
                     "path": os.path.join(folder_path, item) if folder_path else item,
                     "size_bytes": stat.st_size,
                     "size_mb": round(stat.st_size / (1024 * 1024), 2),

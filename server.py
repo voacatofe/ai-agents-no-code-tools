@@ -48,56 +48,7 @@ def read_root():
     return {"status": "ok"}
 
 
-@app.get("/debug/folders")
-def debug_folders():
-    """
-    Debug endpoint to check folder structure and force creation if needed.
-    """
-    try:
-        import os
-        
-        # Verificar caminhos importantes
-        storage_abs_path = os.path.abspath(storage.storage_path)
-        folders_path = os.path.join(storage.storage_path, "folders")
-        temp_path = os.path.join(folders_path, "temp")
-        bg_music_path = os.path.join(folders_path, "Background Music")
-        
-        # Force create default folders
-        print("🔄 Forçando criação de pastas padrão...")
-        storage._create_default_folders()
-        
-        # Get folder info
-        folders = storage.list_folders()
-        root_contents = storage.list_folder_contents("")
-        
-        # Check each folder individually
-        folder_checks = {}
-        for folder_name in ["temp", "Background Music"]:
-            folder_path = os.path.join(folders_path, folder_name)
-            folder_checks[folder_name] = {
-                "exists": os.path.exists(folder_path),
-                "path": folder_path,
-                "files_count": len(os.listdir(folder_path)) if os.path.exists(folder_path) else 0
-            }
-        
-        return {
-            "storage_path": storage_abs_path,
-            "folders_path": folders_path,
-            "folders_path_exists": os.path.exists(folders_path),
-            "folder_checks": folder_checks,
-            "folders": folders,
-            "root_contents": root_contents,
-            "temp_path_exists": os.path.exists(temp_path),
-            "bg_music_path_exists": os.path.exists(bg_music_path),
-            "success": True,
-            "message": "Debug completed successfully"
-        }
-    except Exception as e:
-        return {
-            "error": str(e),
-            "success": False,
-            "storage_path": getattr(storage, 'storage_path', 'unknown') if 'storage' in locals() else 'storage not initialized'
-        }
+
 
 
 @app.get("/files", response_class=HTMLResponse)

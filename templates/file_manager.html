@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" data-theme="light">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -19,7 +19,7 @@
         </div>
         
         <div class="stats" id="stats">
-            <!-- Estatísticas serão carregadas aqui -->
+            <!-- Statistics will be loaded here -->
         </div>
         
         <!-- Breadcrumb Navigation -->
@@ -107,11 +107,11 @@
     <script>
         const API_BASE = '/api/v1/media';
         
-        // Variáveis globais para upload
+        // Global variables for upload
         let uploadQueue = [];
         let isUploading = false;
         
-        // Variáveis globais para sistema de pastas
+        // Global variables for folder system
         let currentFolder = '';
         
         // ==================== THEME FUNCTIONS ====================
@@ -397,7 +397,7 @@
             const files = Array.from(event.target.files);
             if (files.length === 0) return;
             
-            // Adiciona arquivos à fila
+            // Add files to queue
             files.forEach(file => {
                 const uploadId = Date.now() + Math.random();
                 uploadQueue.push({
@@ -409,16 +409,16 @@
                 });
             });
             
-            // Mostra a área de progresso
+            // Show progress area
             document.getElementById('uploadProgress').style.display = 'block';
             updateUploadDisplay();
             
-            // Inicia o upload se não estiver em andamento
+            // Start upload if not in progress
             if (!isUploading) {
                 processUploadQueue();
             }
             
-            // Limpa o input para permitir selecionar os mesmos arquivos novamente
+            // Clear input to allow selecting same files again
             event.target.value = '';
         }
         
@@ -477,15 +477,15 @@
             
             isUploading = false;
             
-            // Remove itens processados após 3 segundos
+            // Remove processed items after 3 seconds
             setTimeout(() => {
                 uploadQueue = uploadQueue.filter(i => i.status === 'waiting' || i.status === 'uploading');
                 if (uploadQueue.length === 0) {
                     document.getElementById('uploadProgress').style.display = 'none';
                 }
                 updateUploadDisplay();
-                loadCombinedView(); // Atualiza a visualização atual
-                loadStats(); // Atualiza as estatísticas
+                loadCombinedView(); // Update current view
+                loadStats(); // Update statistics
             }, 3000);
         }
         
@@ -723,10 +723,14 @@
                             <div class="folder-icon">📁</div>
                             <div class="folder-name">${folder.name}</div>
                             <div class="folder-info">
+                                <div>🆔 ${folder.id}</div>
                                 <div>📊 ${folder.file_count} files</div>
                                 <div>📅 ${new Date(folder.created_at * 1000).toLocaleString('en-US')}</div>
                             </div>
                             <div class="folder-actions" onclick="event.stopPropagation()">
+                                <button class="btn btn-secondary btn-small" onclick="copyId('${folder.id}')">
+                                    📋 Copy ID
+                                </button>
                                 <button class="btn btn-danger btn-small" onclick="deleteFolder('${folder.path}')">
                                     🗑️ Delete
                                 </button>
@@ -894,11 +898,9 @@
                     </div>
                 `;
             } catch (error) {
-                console.error('Erro ao carregar estatísticas:', error);
+                console.error('Error loading statistics:', error);
             }
         }
-        
-
         
         function downloadFile(mediaId) {
             window.open(`${API_BASE}/storage/${mediaId}`, '_blank');
@@ -947,13 +949,13 @@
             }
         });
         
-        // Inicializar tema
+        // Initialize theme
         initTheme();
         
-        // Configurar drag and drop
+        // Setup drag and drop
         setupDragAndDrop();
         
-        // Carregar dados iniciais
+        // Load initial data
         loadStats();
         loadCombinedView(); // Start with combined view
     </script>

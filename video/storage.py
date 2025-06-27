@@ -74,7 +74,7 @@ class Storage:
         Returns:
             str: Safe file path
         """
-        # Tentar novo sistema primeiro (UUID + metadados)
+        # Try new system first (UUID + metadata)
         file_path = self._find_file_by_uuid(media_id)
         if file_path and os.path.exists(file_path):
             return file_path
@@ -97,44 +97,44 @@ class Storage:
     
     def _find_file_by_uuid(self, media_id: str) -> str:
         """
-        Localiza arquivo pelo UUID em todas as pastas (novo sistema).
+        Locates file by UUID in all folders (new system).
         
         Args:
-            media_id (str): UUID do arquivo
+            media_id (str): File UUID
             
         Returns:
-            str: Caminho do arquivo ou string vazia se não encontrado
+            str: File path or empty string if not found
         """
-        # Buscar metadados primeiro
+        # Search metadata first
         metadata = self._get_file_metadata(media_id)
         folder_path = metadata.get("folder_path", "")
         file_extension = metadata.get("file_extension", "")
         
-        # Construir possível nome de arquivo
+        # Build possible filename
         filename = f"{media_id}{file_extension}" if file_extension else media_id
         
-        # Tentar localizar em pasta específica
+        # Try to locate in specific folder
         if folder_path:
             file_path = os.path.join(self.storage_path, "folders", folder_path, filename)
             if os.path.exists(file_path):
                 return file_path
         
-        # Tentar localizar em todas as pastas possíveis
+        # Try to locate in all possible folders
         search_paths = [
-            os.path.join(self.storage_path, "folders"),  # Pastas personalizadas
-            os.path.join(self.storage_path, "image"),    # Pasta padrão image
-            os.path.join(self.storage_path, "video"),    # Pasta padrão video
-            os.path.join(self.storage_path, "audio"),    # Pasta padrão audio
-            os.path.join(self.storage_path, "tmp"),      # Pasta padrão tmp
+            os.path.join(self.storage_path, "folders"),  # Custom folders
+            os.path.join(self.storage_path, "image"),    # Default image folder
+            os.path.join(self.storage_path, "video"),    # Default video folder
+            os.path.join(self.storage_path, "audio"),    # Default audio folder
+            os.path.join(self.storage_path, "tmp"),      # Default tmp folder
         ]
         
         for base_path in search_paths:
             if not os.path.exists(base_path):
                 continue
                 
-            # Buscar arquivo recursivamente
+            # Search file recursively
             for root, dirs, files in os.walk(base_path):
-                # Procurar por arquivo que comece com o UUID
+                # Look for file that starts with the UUID
                 for file in files:
                     if file.startswith(media_id):
                         file_path = os.path.join(root, file)
@@ -225,7 +225,7 @@ class Storage:
 
         if os.path.exists(file_path):
             os.remove(file_path)
-            # Deletar metadados também
+            # Delete metadata too
             self._delete_file_metadata(media_id)
         else:
             raise FileNotFoundError(f"Media file {media_id} not found.")
@@ -404,12 +404,13 @@ class Storage:
                               file_extension: str = "", folder_path: str = "", custom_name: str = "") -> str:
         """
         Upload media to a specific folder.
+        Accepts both real names and normalized folder IDs.
         
         Args:
             media_type (str): Type of media
             media_data (bytes): Binary data of the file
             file_extension (str): File extension
-            folder_path (str): Target folder path
+            folder_path (str): Target folder path (real name or normalized ID)
             custom_name (str): Custom name for the file
             
         Returns:
@@ -419,6 +420,24 @@ class Storage:
         valid_types = [MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO, MediaType.TMP]
         if media_type not in valid_types:
             raise ValueError(f"Invalid media type: {media_type}")
+        
+        # Convert normalized ID to real name if necessary
+        if folder_path:
+            # If contains '/', it's a path - map each part
+            if '/' in folder_path:
+                path_parts = folder_path.split('/')
+                real_parts = []
+                current_parent = ""
+                
+                for part in path_parts:
+                    real_name = self._get_folder_name_from_id(part, current_parent)
+                    real_parts.append(real_name)
+                    current_parent = '/'.join(real_parts) if real_parts else ""
+                
+                folder_path = '/'.join(real_parts)
+            else:
+                # It's a single folder
+                folder_path = self._get_folder_name_from_id(folder_path)
         
         # Validate extension
         if file_extension and (
@@ -432,25 +451,19 @@ class Storage:
         ):
             raise ValueError("Custom name contains invalid characters")
         
-        # Validate folder path
-        if folder_path and (
-            ".." in folder_path or folder_path.startswith("/") or folder_path.startswith("\\")
-        ):
-            raise ValueError("Invalid folder path")
-        
-        # Usar nome customizado se fornecido, senão gerar UUID único
+        # Use custom name if provided, otherwise generate unique UUID
         if custom_name:
-            # Sanificar nome customizado para segurança
+            # Sanitize custom name for security
             safe_name = self._sanitize_filename(custom_name)
             filename = f"{safe_name}{file_extension}" if file_extension else safe_name
         else:
             asset_id = str(uuid.uuid4())
             filename = f"{asset_id}{file_extension}" if file_extension else asset_id
         
-        # Gerar media_id simples - apenas UUID
+        # Generate simple media_id - just UUID
         asset_id = str(uuid.uuid4())
         safe_filename = f"{asset_id}{file_extension}" if file_extension else asset_id
-        media_id = asset_id  # Media ID limpo, sem prefixos
+        media_id = asset_id  # Clean Media ID, no prefixes
         
         # Determine file path
         if folder_path:
@@ -471,7 +484,7 @@ class Storage:
         with open(file_path, "wb") as f:
             f.write(media_data)
         
-        # Salvar metadados do arquivo (incluindo nome customizado)
+        # Save file metadata (including custom name)
         if custom_name:
             self._save_file_metadata(media_id, {
                 "custom_name": custom_name,
@@ -485,13 +498,13 @@ class Storage:
     
     def list_media(self, media_type: Optional[str] = None) -> list:
         """
-        Lista todos os arquivos de mídia armazenados.
+        Lists all stored media files.
         
         Args:
-            media_type (str, optional): Tipo específico de mídia para filtrar
+            media_type (str, optional): Specific media type to filter
             
         Returns:
-            list: Lista de dicionários com informações dos arquivos
+            list: List of dictionaries with file information
         """
         files = []
         
@@ -503,7 +516,7 @@ class Storage:
                 continue
                 
             for filename in os.listdir(media_path):
-                if filename.startswith('.'):  # Ignorar arquivos ocultos
+                if filename.startswith('.'):  # Ignore hidden files
                     continue
                     
                 file_path = os.path.join(media_path, filename)
@@ -523,22 +536,22 @@ class Storage:
                             "file_extension": os.path.splitext(filename)[1].lower()
                         })
                     except Exception as e:
-                        # Log erro mas continua listando outros arquivos
-                        print(f"Erro ao processar arquivo {filename}: {e}")
+                        # Log error but continue listing other files
+                        print(f"Error processing file {filename}: {e}")
                         
-        # Ordena por data de criação (mais recentes primeiro)
+        # Sort by creation date (newest first)
         files.sort(key=lambda x: x["created_at"], reverse=True)
         return files
     
     def get_media_info(self, media_id: str) -> dict:
         """
-        Obtém informações detalhadas sobre um arquivo específico.
+        Gets detailed information about a specific file.
         
         Args:
-            media_id (str): ID do arquivo
+            media_id (str): File ID
             
         Returns:
-            dict: Informações detalhadas do arquivo
+            dict: Detailed file information
         """
         file_path = self._get_safe_file_path(media_id)
         
@@ -563,10 +576,10 @@ class Storage:
     
     def get_storage_stats(self) -> dict:
         """
-        Obtém estatísticas gerais do storage incluindo TODAS as pastas.
+        Gets general storage statistics including ALL folders.
         
         Returns:
-            dict: Estatísticas do storage
+            dict: Storage statistics
         """
         stats = {
             "total_files": 0,
@@ -606,12 +619,12 @@ class Storage:
     
     def _count_files_in_all_folders(self, base_path: str, current_path: str, stats: dict):
         """
-        Recursivamente conta arquivos em todas as pastas e subpastas.
+        Recursively counts files in all folders and subfolders.
         
         Args:
-            base_path (str): Caminho base das pastas
-            current_path (str): Caminho atual relativo
-            stats (dict): Dicionário de estatísticas para atualizar
+            base_path (str): Base path of folders
+            current_path (str): Current relative path
+            stats (dict): Statistics dictionary to update
         """
         try:
             if current_path:
@@ -626,13 +639,13 @@ class Storage:
                 item_path = os.path.join(full_path, item)
                 
                 if os.path.isfile(item_path):
-                    # É um arquivo - contar nas estatísticas
+                    # It's a file - count in statistics
                     try:
                         stat = os.stat(item_path)
                         file_ext = os.path.splitext(item)[1].lower()
                         media_type = self._detect_media_type_from_extension(file_ext)
                         
-                        # Incrementar contadores
+                        # Increment counters
                         stats["by_type"][media_type]["count"] += 1
                         stats["by_type"][media_type]["size_bytes"] += stat.st_size
                         stats["by_type"][media_type]["size_mb"] = round(stats["by_type"][media_type]["size_bytes"] / (1024 * 1024), 2)
@@ -641,21 +654,21 @@ class Storage:
                         stats["total_size_bytes"] += stat.st_size
                         
                     except Exception as e:
-                        print(f"Erro ao processar arquivo {item}: {e}")
+                        print(f"Error processing file {item}: {e}")
                         
                 elif os.path.isdir(item_path):
-                    # É uma pasta - recursão para contar subpastas
+                    # It's a folder - recursion to count subfolders
                     new_path = os.path.join(current_path, item) if current_path else item
                     self._count_files_in_all_folders(base_path, new_path, stats)
                     
         except Exception as e:
-            print(f"Erro ao processar pasta {current_path}: {e}")
+            print(f"Error processing folder {current_path}: {e}")
     
     def _create_default_folders(self):
         """
-        Cria pastas padrão no sistema.
+        Creates default folders in the system.
         """
-        # Garantir que o diretório folders existe
+        # Ensure the folders directory exists
         folders_path = os.path.join(self.storage_path, "folders")
         os.makedirs(folders_path, exist_ok=True)
         
@@ -663,52 +676,52 @@ class Storage:
         for folder_name in default_folders:
             try:
                 self.create_folder(folder_name)
-                print(f"✅ Pasta '{folder_name}' criada com sucesso")
+                print(f"✅ Folder '{folder_name}' created successfully")
             except Exception as e:
-                print(f"⚠️  Erro ao criar pasta '{folder_name}': {e}")
-                # Tentar criar diretamente se create_folder falhar
+                print(f"⚠️  Error creating folder '{folder_name}': {e}")
+                # Try to create directly if create_folder fails
                 folder_path = os.path.join(folders_path, folder_name)
                 os.makedirs(folder_path, exist_ok=True)
-                print(f"✅ Pasta '{folder_name}' criada diretamente")
+                print(f"✅ Folder '{folder_name}' created directly")
     
     def create_folder(self, folder_name: str, parent_folder: str = "") -> bool:
         """
-        Cria uma nova pasta no sistema.
+        Creates a new folder in the system.
         
         Args:
-            folder_name (str): Nome da pasta a ser criada
-            parent_folder (str): Pasta pai (caminho relativo)
+            folder_name (str): Name of the folder to be created
+            parent_folder (str): Parent folder (relative path)
             
         Returns:
-            bool: True se criada com sucesso, False se já existe
+            bool: True if created successfully, False if already exists
         """
-        # Validar nome da pasta
+        # Validate folder name
         if not folder_name or ".." in folder_name or "/" in folder_name or "\\" in folder_name:
             raise ValueError("Invalid folder name")
         
-        # Construir caminho da pasta
+        # Build folder path
         if parent_folder:
             folder_path = os.path.join(self.storage_path, "folders", parent_folder, folder_name)
         else:
             folder_path = os.path.join(self.storage_path, "folders", folder_name)
         
-        # Verificar se já existe
+        # Check if already exists
         if os.path.exists(folder_path):
             return False
             
-        # Criar pasta
+        # Create folder
         os.makedirs(folder_path, exist_ok=True)
         return True
     
     def list_folders(self, parent_folder: str = "") -> list:
         """
-        Lista pastas no sistema.
+        Lists folders in the system.
         
         Args:
-            parent_folder (str): Pasta pai para listar subpastas
+            parent_folder (str): Parent folder to list subfolders
             
         Returns:
-            list: Lista de pastas com informações
+            list: List of folders with information
         """
         folders = []
         
@@ -725,10 +738,11 @@ class Storage:
             if os.path.isdir(item_path):
                 try:
                     stat = os.stat(item_path)
-                    # Contar arquivos na pasta
+                    # Count files in folder
                     file_count = self._count_files_in_folder(os.path.join(parent_folder, item) if parent_folder else item)
                     
                     folders.append({
+                        "id": self._normalize_folder_name(item),  # Normalized ID
                         "name": item,
                         "path": os.path.join(parent_folder, item) if parent_folder else item,
                         "created_at": stat.st_ctime,
@@ -736,23 +750,42 @@ class Storage:
                         "file_count": file_count
                     })
                 except Exception as e:
-                    print(f"Erro ao processar pasta {item}: {e}")
+                    print(f"Error processing folder {item}: {e}")
         
-        # Ordena por nome
+        # Sort by name
         folders.sort(key=lambda x: x["name"])
         return folders
     
     def delete_folder(self, folder_path: str) -> bool:
         """
-        Deleta uma pasta e todo seu conteúdo.
+        Deletes a folder and all its contents.
+        Accepts both real names and normalized folder IDs.
         
         Args:
-            folder_path (str): Caminho da pasta a ser deletada
+            folder_path (str): Path of the folder to be deleted (real name or normalized ID)
             
         Returns:
-            bool: True se deletada com sucesso
+            bool: True if deleted successfully
         """
-        # Lista de pastas protegidas que não podem ser deletadas
+        # Convert normalized ID to real name if necessary
+        if folder_path:
+            # If contains '/', it's a path - map each part
+            if '/' in folder_path:
+                path_parts = folder_path.split('/')
+                real_parts = []
+                current_parent = ""
+                
+                for part in path_parts:
+                    real_name = self._get_folder_name_from_id(part, current_parent)
+                    real_parts.append(real_name)
+                    current_parent = '/'.join(real_parts) if real_parts else ""
+                
+                folder_path = '/'.join(real_parts)
+            else:
+                # It's a single folder
+                folder_path = self._get_folder_name_from_id(folder_path)
+        
+        # List of protected folders that cannot be deleted
         protected_folders = ["temp", "Background Music"]
         
         if not folder_path or folder_path in protected_folders:
@@ -769,8 +802,33 @@ class Storage:
     
     def _count_files_in_folder(self, folder_path: str) -> int:
         """
-        Conta arquivos em uma pasta específica.
+        Counts files in a specific folder.
+        Accepts both real names and normalized folder IDs.
+        
+        Args:
+            folder_path (str): Folder path (real name or normalized ID)
+            
+        Returns:
+            int: Number of files in the folder
         """
+        # Converter ID normalizado para nome real se necessário
+        if folder_path:
+            # Se contém '/', é um caminho - mapear cada parte
+            if '/' in folder_path:
+                path_parts = folder_path.split('/')
+                real_parts = []
+                current_parent = ""
+                
+                for part in path_parts:
+                    real_name = self._get_folder_name_from_id(part, current_parent)
+                    real_parts.append(real_name)
+                    current_parent = '/'.join(real_parts) if real_parts else ""
+                
+                folder_path = '/'.join(real_parts)
+            else:
+                # É uma pasta única
+                folder_path = self._get_folder_name_from_id(folder_path)
+        
         full_path = os.path.join(self.storage_path, "folders", folder_path)
         if not os.path.exists(full_path):
             return 0
@@ -782,13 +840,13 @@ class Storage:
     
     def _detect_media_type_from_extension(self, file_extension: str) -> str:
         """
-        Detecta o tipo de mídia baseado na extensão do arquivo.
+        Detects media type based on file extension.
         
         Args:
-            file_extension (str): Extensão do arquivo (com ou sem ponto)
+            file_extension (str): File extension (with or without dot)
             
         Returns:
-            str: Tipo de mídia detectado
+            str: Detected media type
         """
         ext = file_extension.lower().lstrip('.')
         
@@ -807,30 +865,30 @@ class Storage:
     
     def _sanitize_filename(self, filename: str) -> str:
         """
-        Sanifica um nome de arquivo removendo caracteres perigosos.
+        Sanitizes a filename by removing dangerous characters.
         
         Args:
-            filename (str): Nome original do arquivo
+            filename (str): Original filename
             
         Returns:
-            str: Nome sanificado e seguro
+            str: Sanitized and safe name
         """
         import re
         
-        # Remove caracteres perigosos e mantém apenas letras, números, hífen, underscore e espaços
+        # Remove dangerous characters and keep only letters, numbers, hyphens, underscores and spaces
         sanitized = re.sub(r'[<>:"/\\|?*]', '', filename)
         
-        # Substitui múltiplos espaços por um único espaço
+        # Replace multiple spaces with single space
         sanitized = re.sub(r'\s+', ' ', sanitized)
         
-        # Remove espaços no início e fim
+        # Remove spaces at beginning and end
         sanitized = sanitized.strip()
         
-        # Se ficou vazio após sanificação, usar UUID
+        # If empty after sanitization, use UUID
         if not sanitized:
             sanitized = str(uuid.uuid4())
         
-        # Limitar comprimento (máximo 50 caracteres)
+        # Limit length (maximum 50 characters)
         if len(sanitized) > 50:
             sanitized = sanitized[:50]
         
@@ -838,11 +896,11 @@ class Storage:
     
     def _save_file_metadata(self, media_id: str, metadata: dict):
         """
-        Salva metadados de um arquivo.
+        Saves file metadata.
         
         Args:
-            media_id (str): ID do arquivo
-            metadata (dict): Metadados para salvar
+            media_id (str): File ID
+            metadata (dict): Metadata to save
         """
         import json
         
@@ -856,13 +914,13 @@ class Storage:
     
     def _get_file_metadata(self, media_id: str) -> dict:
         """
-        Recupera metadados de um arquivo.
+        Retrieves file metadata.
         
         Args:
-            media_id (str): ID do arquivo
+            media_id (str): File ID
             
         Returns:
-            dict: Metadados do arquivo ou dict vazio se não existir
+            dict: File metadata or empty dict if doesn't exist
         """
         import json
         
@@ -880,10 +938,10 @@ class Storage:
     
     def _delete_file_metadata(self, media_id: str):
         """
-        Deleta metadados de um arquivo.
+        Deletes file metadata.
         
         Args:
-            media_id (str): ID do arquivo
+            media_id (str): File ID
         """
         metadata_dir = os.path.join(self.storage_path, "metadata")
         metadata_file = os.path.join(metadata_dir, f"{media_id}.json")
@@ -892,24 +950,73 @@ class Storage:
             try:
                 os.remove(metadata_file)
             except Exception:
-                pass  # Falha silenciosa se não conseguir deletar metadados
+                pass  # Silent failure if can't delete metadata
     
-
-    
-
-    
-
-    
-    def list_folder_contents(self, folder_path: str = "") -> dict:
+    def _normalize_folder_name(self, folder_name: str) -> str:
         """
-        Lista conteúdo de uma pasta (subpastas e arquivos).
+        Normalizes a folder name to create a safe ID.
+        Removes accents, converts to lowercase, replaces spaces and special characters with underscore.
         
         Args:
-            folder_path (str): Caminho da pasta
+            folder_name (str): Original folder name
             
         Returns:
-            dict: Dicionário com folders e files
+            str: Normalized folder ID
         """
+        import re
+        import unicodedata
+        
+        # Remove accents and special characters
+        normalized = unicodedata.normalize('NFD', folder_name)
+        normalized = ''.join(char for char in normalized if unicodedata.category(char) != 'Mn')
+        
+        # Convert to lowercase
+        normalized = normalized.lower()
+        
+        # Replace spaces and special characters with underscore
+        normalized = re.sub(r'[^a-z0-9_]', '_', normalized)
+        
+        # Remove multiple consecutive underscores
+        normalized = re.sub(r'_+', '_', normalized)
+        
+        # Remove underscores at beginning and end
+        normalized = normalized.strip('_')
+        
+        # If empty, use 'folder'
+        if not normalized:
+            normalized = 'folder'
+        
+        return normalized
+
+    def list_folder_contents(self, folder_path: str = "") -> dict:
+        """
+        Lists folder contents (subfolders and files).
+        Accepts both real names and normalized folder IDs.
+        
+        Args:
+            folder_path (str): Folder path (real name or normalized ID)
+            
+        Returns:
+            dict: Dictionary with folders and files
+        """
+        # Converter ID normalizado para nome real se necessário
+        if folder_path:
+            # Se contém '/', é um caminho - mapear cada parte
+            if '/' in folder_path:
+                path_parts = folder_path.split('/')
+                real_parts = []
+                current_parent = ""
+                
+                for part in path_parts:
+                    real_name = self._get_folder_name_from_id(part, current_parent)
+                    real_parts.append(real_name)
+                    current_parent = '/'.join(real_parts) if real_parts else ""
+                
+                folder_path = '/'.join(real_parts)
+            else:
+                # É uma pasta única
+                folder_path = self._get_folder_name_from_id(folder_path)
+        
         if folder_path:
             full_path = os.path.join(self.storage_path, "folders", folder_path)
         else:
@@ -924,42 +1031,43 @@ class Storage:
         if not os.path.exists(full_path):
             return result
         
-        # Listar subpastas
+        # List subfolders
         for item in os.listdir(full_path):
             item_path = os.path.join(full_path, item)
             if os.path.isdir(item_path):
                 stat = os.stat(item_path)
                 result["folders"].append({
+                    "id": self._normalize_folder_name(item),  # Normalized ID
                     "name": item,
                     "path": os.path.join(folder_path, item) if folder_path else item,
                     "created_at": stat.st_ctime,
                     "file_count": self._count_files_in_folder(os.path.join(folder_path, item) if folder_path else item)
                 })
             elif os.path.isfile(item_path):
-                # Listar arquivos  
+                # List files  
                 stat = os.stat(item_path)
                 
-                # Detectar media_type baseado na extensão
+                # Detect media_type based on extension
                 file_ext = os.path.splitext(item)[1].lower()
                 media_type = self._detect_media_type_from_extension(file_ext)
                 
-                # Para arquivos, tentamos encontrar pelo nome UUID  
-                # Extrair UUID do nome do arquivo (formato: uuid.ext)
+                # For files, try to find by UUID name  
+                # Extract UUID from filename (format: uuid.ext)
                 file_uuid = os.path.splitext(item)[0]
-                media_id = file_uuid  # Media ID é sempre o UUID limpo
+                media_id = file_uuid  # Media ID is always the clean UUID
                 
-                # Buscar metadados para obter nome customizado
+                # Search metadata to get custom name
                 metadata = self._get_file_metadata(media_id)
                 custom_name = metadata.get("custom_name", "")
                 
-                # Nome para exibição: nome customizado ou UUID se não tiver
+                # Display name: custom name or UUID if none
                 display_name = f"{custom_name}{file_ext}" if custom_name else item
                 
                 result["files"].append({
                     "media_id": media_id,
                     "media_type": media_type,
-                    "name": display_name,  # Nome customizado para exibição
-                    "filename": display_name,  # Consistência
+                    "name": display_name,  # Custom name for display
+                    "filename": display_name,  # Consistency
                     "path": os.path.join(folder_path, item) if folder_path else item,
                     "size_bytes": stat.st_size,
                     "size_mb": round(stat.st_size / (1024 * 1024), 2),
@@ -968,8 +1076,39 @@ class Storage:
                     "file_extension": file_ext
                 })
         
-        # Ordenar
+        # Sort
         result["folders"].sort(key=lambda x: x["name"])
         result["files"].sort(key=lambda x: x["name"])
         
         return result
+
+    def _get_folder_name_from_id(self, folder_id: str, parent_folder: str = "") -> str:
+        """
+        Converts a normalized folder ID to the real folder name.
+        
+        Args:
+            folder_id (str): Normalized folder ID
+            parent_folder (str): Parent folder (optional)
+            
+        Returns:
+            str: Real folder name or folder_id itself if no match found
+        """
+        # If it's already a valid folder path, return as is
+        if not folder_id:
+            return folder_id
+            
+        # List all available folders
+        folders = self.list_folders(parent_folder)
+        
+        # Search for exact ID
+        for folder in folders:
+            if folder.get("id") == folder_id:
+                return folder["name"]
+        
+        # If not found by ID, try by name (compatibility)
+        for folder in folders:
+            if folder["name"] == folder_id:
+                return folder["name"]
+        
+        # If not found, return folder_id itself (might be a valid name)
+        return folder_id

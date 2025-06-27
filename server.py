@@ -65,7 +65,7 @@ def file_manager():
         <html>
             <body>
                 <h1>Erro: Template não encontrado</h1>
-                <p>O arquivo de template não foi encontrado. Verifique se existe o arquivo templates/file_manager.html</p>
+                <p>Template file not found. Please check if the file templates/file_manager.html exists</p>
             </body>
         </html>
         """, status_code=404)
@@ -244,28 +244,16 @@ def upload_file(
 ):
     """
     Upload a file and return its ID.
+    Aceita tanto nomes reais quanto IDs normalizados de pastas.
     
     Args:
-        folder_path: Target folder path (e.g., 'temp', 'Background Music'). Optional - if not provided, saves to default media folders.
+        folder_path: Target folder path (nome real ou ID normalizado). Optional - if not provided, saves to default media folders.
     """
     if media_type not in ["image", "video", "audio"]:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"error": f"Invalid media type: {media_type}"},
         )
-    
-    # Mapeamento de nomes alternativos de pastas para compatibilidade com N8N
-    if folder_path:
-        folder_aliases = {
-            "background_music": "Background Music",
-            "Background_Music": "Background Music",
-            "backgroundmusic": "Background Music",
-            "temp": "temp",
-            "temporary": "temp",
-            "tmp": "temp"
-        }
-        # Usar o nome correto da pasta se houver um alias
-        folder_path = folder_aliases.get(folder_path, folder_path)
     
     if file:
         if folder_path:
@@ -549,9 +537,10 @@ def create_folder(
 def delete_folder(folder_path: str):
     """
     Delete a folder and all its contents.
+    Aceita tanto nomes reais quanto IDs normalizados de pastas.
     
     Args:
-        folder_path: Path of the folder to delete
+        folder_path: Path of the folder to delete (nome real ou ID normalizado)
     """
     try:
         deleted = storage.delete_folder(folder_path)
@@ -596,33 +585,13 @@ def get_root_folder_contents():
 def get_folder_contents(folder_path: str):
     """
     Get contents of a specific folder (subfolders and files).
+    Aceita tanto nomes reais quanto IDs normalizados de pastas.
     
     Args:
-        folder_path: Path of the folder to explore
+        folder_path: Path of the folder to explore (nome real ou ID normalizado)
     """
     try:
-        # Mapeamento de nomes alternativos de pastas para compatibilidade com N8N
-        folder_aliases = {
-            "background_music": "Background Music",
-            "Background_Music": "Background Music",
-            "backgroundmusic": "Background Music",
-            "temp": "temp",
-            "temporary": "temp",
-            "tmp": "temp"
-        }
-        
-        # Verificar se existe um alias para o folder_path
-        actual_folder_path = folder_aliases.get(folder_path, folder_path)
-        
-        # Tentar primeiro com o nome original
         contents = storage.list_folder_contents(folder_path)
-        
-        # Se não encontrar arquivos e há um alias diferente, tentar com o alias
-        if (not contents.get("files") and not contents.get("folders")) and actual_folder_path != folder_path:
-            contents = storage.list_folder_contents(actual_folder_path)
-            # Atualizar o current_path para o nome real da pasta
-            contents["current_path"] = actual_folder_path
-            
         return contents
     except Exception as e:
         return JSONResponse(
@@ -843,7 +812,7 @@ def generate_captioned_video(
             shadow_blur=10,
             stroke_size=5,
         )
-        logger.debug(f"Arquivo de legenda criado em: {subtitle_path}")
+        logger.debug(f"Subtitle file created at: {subtitle_path}")
         builder.set_captions(
             file_path=subtitle_path,
         )

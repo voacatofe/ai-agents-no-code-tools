@@ -112,7 +112,7 @@ def get_kokoro_voices(lang_code: Optional[str] = None):
         lang_code: Language code (e.g., 'pt-br', 'en-us', 'pt'). If not provided, returns all voices.
     """
     tts_manager = TTS()
-    voices = tts_manager.valid_kokoro_voices(lang_code=lang_code)
+    voices = tts_manager.valid_kokoro_voices(lang_code=lang_code if lang_code else "")
     return {"voices": voices, "language": lang_code or "all"}
 
 
@@ -137,7 +137,7 @@ def generate_kokoro_tts(
             content={"error": f"Invalid voice: {voice}. Valid voices: {voices}"},
         )
     audio_id, audio_path = storage.create_media_filename_with_id(
-        media_type="audio", file_extension=".wav", custom_name=name
+        media_type="audio", file_extension=".wav", custom_name=name or ""
     )
     tmp_file_id = storage.create_tmp_file(audio_id)
 
@@ -146,7 +146,7 @@ def generate_kokoro_tts(
             text=text,
             output_path=audio_path,
             voice=voice,
-            speed=speed if speed else 1.0,
+            speed=int(speed) if speed else 1,
         )
         storage.delete_media(tmp_file_id)
 
@@ -189,13 +189,13 @@ def generate_chatterbox_tts(
 
     sample_audio_path = None
     if sample_audio_file:
-        if not sample_audio_file.filename.endswith(".wav"):
+        if not sample_audio_file.filename or not sample_audio_file.filename.endswith(".wav"):
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={"error": "Sample audio file must be a .wav file."},
             )
         sample_audio_id = storage.upload_media(
-            media_type="tmp",
+            media_type="audio",
             media_data=sample_audio_file.file.read(),
             file_extension=".wav",
         )
@@ -212,14 +212,15 @@ def generate_chatterbox_tts(
 
     def bg_task():
         try:
-            tts_manager.chatterbox(
-                text=text,
-                output_path=audio_path,
-                sample_audio_path=sample_audio_path,
-                exaggeration=exaggeration,
-                cfg_weight=cfg_weight,
-                temperature=temperature,
-            )
+            if sample_audio_path:
+                tts_manager.chatterbox(
+                    text=text,
+                    output_path=audio_path,
+                    sample_audio_path=sample_audio_path,
+                    exaggeration=exaggeration or 0.5,
+                    cfg_weight=cfg_weight or 0.5,
+                    temperature=temperature or 0.8,
+                )
         except Exception as e:
             logger.error(f"Error in Chatterbox TTS: {e}")
         finally:
@@ -257,16 +258,16 @@ def upload_file(
             file_id = storage.upload_media_to_folder(
                 media_type=media_type,
                 media_data=file.file.read(),
-                file_extension=os.path.splitext(file.filename)[1],
+                file_extension=os.path.splitext(file.filename or "")[1],
                 folder_path=folder_path,
-                custom_name=name
+                custom_name=name or ""
             )
         else:
             file_id = storage.upload_media(
                 media_type=media_type,
                 media_data=file.file.read(),
-                file_extension=os.path.splitext(file.filename)[1],
-                custom_name=name
+                file_extension=os.path.splitext(file.filename or "")[1],
+                custom_name=name or ""
             )
 
         return {"file_id": file_id}
@@ -593,8 +594,8 @@ def merge_videos(
     """
     Merge multiple videos into one.
     """
-    video_ids = video_ids.split(",") if video_ids else []
-    if not video_ids:
+    video_id_list = video_ids.split(",") if video_ids else []
+    if not video_id_list:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"error": "At least one video ID is required."},
@@ -605,7 +606,7 @@ def merge_videos(
     )
 
     video_paths = []
-    for video_id in video_ids:
+    for video_id in video_id_list:
         if not storage.media_exists(video_id):
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,

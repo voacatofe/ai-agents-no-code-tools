@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Optional
 import uuid
 import os
 import requests
@@ -86,7 +86,7 @@ class Storage:
         return file_path
 
     def upload_media(
-        self, media_type: MediaType, media_data: bytes, file_extension: str = "", custom_name: str = ""
+        self, media_type: str, media_data: bytes, file_extension: str = "", custom_name: str = ""
     ) -> str:
         """
         Uploads media to the server.
@@ -116,14 +116,9 @@ class Storage:
         ):
             raise ValueError("Custom name contains invalid characters")
 
-        # Use custom name if provided, otherwise generate UUID
-        if custom_name:
-            # Remove any existing extension from custom_name to avoid double extensions
-            name_without_ext = os.path.splitext(custom_name)[0]
-            filename = f"{name_without_ext}{file_extension}" if file_extension else name_without_ext
-        else:
-            asset_id = str(uuid.uuid4())
-            filename = f"{asset_id}{file_extension}" if file_extension else asset_id
+        # SEMPRE gerar filename único para segurança, independente do nome customizado
+        asset_id = str(uuid.uuid4())
+        filename = f"{asset_id}{file_extension}" if file_extension else asset_id
             
         file_path = os.path.join(self.storage_path, media_type, filename)
 
@@ -201,7 +196,7 @@ class Storage:
 
     ### untested
     def create_media_filename(
-        self, media_type: MediaType, file_extension: str = ""
+        self, media_type: str, file_extension: str = ""
     ) -> str:
         # Validate media type
         valid_types = [MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO, MediaType.TMP]
@@ -219,7 +214,7 @@ class Storage:
         return f"{media_type}_{filename}"
 
     def create_media_filename_with_id(
-        self, media_type: MediaType, file_extension: str = "", custom_name: str = ""
+        self, media_type: str, file_extension: str = "", custom_name: str = ""
     ) -> Tuple[str, str]:
         if custom_name:
             file_id = self.create_media_filename_with_custom_name(media_type, file_extension, custom_name)
@@ -228,7 +223,7 @@ class Storage:
         return file_id, self.get_media_path(file_id)
     
     def create_media_filename_with_custom_name(
-        self, media_type: MediaType, file_extension: str = "", custom_name: str = ""
+        self, media_type: str, file_extension: str = "", custom_name: str = ""
     ) -> str:
         # Validate media type
         valid_types = [MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO, MediaType.TMP]
@@ -247,14 +242,9 @@ class Storage:
         ):
             raise ValueError("Custom name contains invalid characters")
 
-        # Use custom name if provided, otherwise generate UUID
-        if custom_name:
-            # Remove any existing extension from custom_name to avoid double extensions
-            name_without_ext = os.path.splitext(custom_name)[0]
-            filename = f"{name_without_ext}{file_extension}" if file_extension else name_without_ext
-        else:
-            asset_id = str(uuid.uuid4())
-            filename = f"{asset_id}{file_extension}" if file_extension else asset_id
+        # SEMPRE gerar ID único para segurança, independente do nome customizado
+        asset_id = str(uuid.uuid4())
+        filename = f"{asset_id}{file_extension}" if file_extension else asset_id
             
         return f"{media_type}_{filename}"
 
@@ -287,7 +277,7 @@ class Storage:
             pass
         return tmp_id
 
-    def get_media_type(self, media_id: str) -> MediaType:
+    def get_media_type(self, media_id: str) -> str:
         """
         Gets the media type of the given media ID.
 
@@ -319,7 +309,7 @@ class Storage:
             return False
         
     def upload_media_from_url(
-        self, media_type: MediaType, url: str
+        self, media_type: str, url: str
     ) -> str:
         """
         Uploads media from a URL.
@@ -379,13 +369,9 @@ class Storage:
         ):
             raise ValueError("Invalid folder path")
         
-        # Generate filename
-        if custom_name:
-            name_without_ext = os.path.splitext(custom_name)[0]
-            filename = f"{name_without_ext}{file_extension}" if file_extension else name_without_ext
-        else:
-            asset_id = str(uuid.uuid4())
-            filename = f"{asset_id}{file_extension}" if file_extension else asset_id
+        # SEMPRE gerar filename único para segurança, independente do nome customizado  
+        asset_id = str(uuid.uuid4())
+        filename = f"{asset_id}{file_extension}" if file_extension else asset_id
         
         # Determine file path
         if folder_path:
@@ -410,7 +396,7 @@ class Storage:
         
         return media_id
     
-    def list_media(self, media_type: str = None) -> list:
+    def list_media(self, media_type: Optional[str] = None) -> list:
         """
         Lista todos os arquivos de mídia armazenados.
         

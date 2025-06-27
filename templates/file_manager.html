@@ -383,11 +383,6 @@
         
         <!-- Controls -->
         <div class="controls">
-            <div class="folder-view-toggle">
-                <span class="view-mode active" data-view="folders" onclick="setViewMode('folders')">📁 Folders</span>
-                <span class="view-mode" data-view="files" onclick="setViewMode('files')">📄 Files</span>
-            </div>
-            
             <select id="typeFilter">
                 <option value="">All Types</option>
                 <option value="image">Images</option>
@@ -395,7 +390,7 @@
                 <option value="audio">Audio</option>
             </select>
             
-            <button class="btn btn-primary" onclick="refreshCurrentView()">🔄 Refresh</button>
+            <button class="btn btn-primary" onclick="loadCombinedView()">🔄 Refresh</button>
             <button class="btn btn-secondary" onclick="loadStats()">📊 Statistics</button>
             <button class="btn btn-primary" onclick="toggleCreateFolderForm()">📁 New Folder</button>
             <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">📤 Upload Files</button>
@@ -437,7 +432,6 @@
         
         // Variáveis globais para sistema de pastas
         let currentFolder = '';
-        let currentViewMode = 'folders'; // 'folders' ou 'files'
         
         function showNotification(message, type = 'success') {
             const notification = document.createElement('div');
@@ -557,7 +551,7 @@
                     document.getElementById('uploadProgress').style.display = 'none';
                 }
                 updateUploadDisplay();
-                refreshCurrentView(); // Atualiza a visualização atual
+                loadCombinedView(); // Atualiza a visualização atual
                 loadStats(); // Atualiza as estatísticas
             }, 3000);
         }
@@ -587,27 +581,10 @@
             return result;
         }
         
-        // ==================== FOLDER SYSTEM FUNCTIONS ====================
+        // ==================== COMBINED VIEW FUNCTIONS ====================
         
-        function setViewMode(mode) {
-            currentViewMode = mode;
-            
-            // Update UI
-            document.querySelectorAll('.view-mode').forEach(el => {
-                el.classList.remove('active');
-            });
-            document.querySelector(`[data-view="${mode}"]`).classList.add('active');
-            
-            // Load content based on mode
-            refreshCurrentView();
-        }
-        
-        function refreshCurrentView() {
-            if (currentViewMode === 'folders') {
-                loadFolderContents(currentFolder);
-            } else {
-                loadFiles();
-            }
+        function loadCombinedView() {
+            loadFolderContents(currentFolder);
         }
         
         function updateBreadcrumb(folderPath) {
@@ -647,37 +624,45 @@
         function navigateToFolder(folderPath) {
             currentFolder = folderPath;
             updateBreadcrumb(folderPath);
-            
-            if (currentViewMode === 'folders') {
-                loadFolderContents(folderPath);
-            } else {
-                loadFiles();
-            }
+            loadFolderContents(folderPath);
         }
         
         async function loadFolderContents(folderPath = '') {
             const content = document.getElementById('content');
+            const typeFilter = document.getElementById('typeFilter').value;
             
             content.innerHTML = `
                 <div class="loading">
                     <div class="spinner"></div>
-                    <p>Loading folder contents...</p>
+                    <p>Loading content...</p>
                 </div>
             `;
             
             try {
-                const url = folderPath ? 
+                // Load folders and folder files
+                const folderUrl = folderPath ? 
                     `${API_BASE}/folders/${encodeURIComponent(folderPath)}/contents` : 
                     `${API_BASE}/folders/root/contents`;
                     
-                const response = await fetch(url);
-                const data = await response.json();
+                const folderResponse = await fetch(folderUrl);
+                const folderData = await folderResponse.json();
+                
+                // Load all files (for root view when no folder selected) with type filter
+                let allFiles = [];
+                if (!folderPath) {
+                    const filesUrl = typeFilter ? 
+                        `${API_BASE}/storage/list?media_type=${typeFilter}` : 
+                        `${API_BASE}/storage/list`;
+                    const filesResponse = await fetch(filesUrl);
+                    const filesData = await filesResponse.json();
+                    allFiles = filesData.files || [];
+                }
                 
                 let contentHtml = '';
                 
-                // Show folders
-                if (data.folders && data.folders.length > 0) {
-                    const foldersGrid = data.folders.map(folder => `
+                // Show folders first
+                if (folderData.folders && folderData.folders.length > 0) {
+                    const foldersGrid = folderData.folders.map(folder => `
                         <div class="folder-card" onclick="navigateToFolder('${folder.path}')">
                             <div class="folder-icon">📁</div>
                             <div class="folder-name">${folder.name}</div>
@@ -696,21 +681,37 @@
                     contentHtml += `<div class="files-grid">${foldersGrid}</div>`;
                 }
                 
-                // Show files in current folder
-                if (data.files && data.files.length > 0) {
-                    const filesGrid = data.files.map(file => `
+                // Show files in current folder or all files if in root
+                const filesToShow = folderPath ? (folderData.files || []) : allFiles;
+                
+                if (filesToShow.length > 0) {
+                    const filesGrid = filesToShow.map(file => `
                         <div class="file-card">
-                            <div class="file-type type-file">FILE</div>
-                            <div class="file-name">${file.name}</div>
+                            <div class="file-type type-${file.media_type || 'file'}">${(file.media_type || 'FILE').toUpperCase()}</div>
+                            <div class="file-name">${file.filename || file.name}</div>
                             <div class="file-info">
                                 <div>📦 ${file.size_mb} MB</div>
-                                <div>📅 ${new Date(file.created_at * 1000).toLocaleString('en-US')}</div>
+                                <div>📅 ${new Date((file.created_at) * 1000).toLocaleString('en-US')}</div>
+                                ${file.media_id ? `<div>🆔 ${file.media_id}</div>` : ''}
                             </div>
+                            ${file.media_id ? `
+                                <div class="file-actions">
+                                    <button class="btn btn-primary btn-small" onclick="downloadFile('${file.media_id}')">
+                                        ⬇️ Download
+                                    </button>
+                                    <button class="btn btn-secondary btn-small" onclick="copyId('${file.media_id}')">
+                                        📋 Copy ID
+                                    </button>
+                                    <button class="btn btn-danger btn-small" onclick="deleteFile('${file.media_id}')">
+                                        🗑️ Delete
+                                    </button>
+                                </div>
+                            ` : ''}
                         </div>
                     `).join('');
                     
                     if (contentHtml) {
-                        contentHtml += `<br><h3>📄 Files in this folder:</h3><div class="files-grid">${filesGrid}</div>`;
+                        contentHtml += `<br><h3>📄 Files:</h3><div class="files-grid">${filesGrid}</div>`;
                     } else {
                         contentHtml = `<div class="files-grid">${filesGrid}</div>`;
                     }
@@ -719,8 +720,8 @@
                 if (!contentHtml) {
                     contentHtml = `
                         <div class="empty-state">
-                            <h3>📁 Empty folder</h3>
-                            <p>This folder is empty. Upload some files or create subfolders.</p>
+                            <h3>📁 Empty</h3>
+                            <p>No folders or files found. Upload some files or create folders.</p>
                         </div>
                     `;
                 }
@@ -730,7 +731,7 @@
             } catch (error) {
                 content.innerHTML = `
                     <div class="empty-state">
-                        <h3>❌ Error loading folder</h3>
+                        <h3>❌ Error loading content</h3>
                         <p>${error.message}</p>
                     </div>
                 `;
@@ -773,7 +774,7 @@
                     const result = await response.json();
                     showNotification(`✅ Folder '${folderName}' created successfully!`);
                     toggleCreateFolderForm();
-                    refreshCurrentView();
+                    loadCombinedView();
                 } else {
                     const errorData = await response.json();
                     showNotification(`❌ ${errorData.error}`, 'error');
@@ -795,7 +796,7 @@
                 
                 if (response.ok) {
                     showNotification(`🗑️ Folder '${folderPath}' deleted successfully!`);
-                    refreshCurrentView();
+                    loadCombinedView();
                 } else {
                     const errorData = await response.json();
                     showNotification(`❌ ${errorData.error}`, 'error');
@@ -805,7 +806,7 @@
             }
         }
         
-        // ==================== END FOLDER SYSTEM FUNCTIONS ====================
+        // ==================== END COMBINED VIEW FUNCTIONS ====================
         
         async function loadStats() {
             try {
@@ -840,73 +841,7 @@
             }
         }
         
-        async function loadFiles() {
-            const typeFilter = document.getElementById('typeFilter').value;
-            const content = document.getElementById('content');
-            
-            content.innerHTML = `
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p>Loading files...</p>
-                </div>
-            `;
-            
-            try {
-                const url = typeFilter ? 
-                    `${API_BASE}/storage/list?media_type=${typeFilter}` : 
-                    `${API_BASE}/storage/list`;
-                    
-                const response = await fetch(url);
-                const data = await response.json();
-                
-                if (data.files.length === 0) {
-                    content.innerHTML = `
-                        <div class="empty-state">
-                            <h3>📁 No files found</h3>
-                            <p>Upload some files to see them here</p>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                const filesGrid = data.files.map(file => `
-                    <div class="file-card">
-                        <div class="file-type type-${file.media_type}">${file.media_type}</div>
-                        <div class="file-name">${file.filename}</div>
-                        <div class="file-info">
-                            <div>📦 ${file.size_mb} MB</div>
-                            <div>📅 ${new Date(file.created_at * 1000).toLocaleString('en-US')}</div>
-                            <div>🆔 ${file.media_id}</div>
-                        </div>
-                        <div class="file-actions">
-                            <button class="btn btn-primary btn-small" onclick="downloadFile('${file.media_id}')">
-                                ⬇️ Download
-                            </button>
-                            <button class="btn btn-secondary btn-small" onclick="copyId('${file.media_id}')">
-                                📋 Copy ID
-                            </button>
-                            <button class="btn btn-danger btn-small" onclick="deleteFile('${file.media_id}')">
-                                🗑️ Delete
-                            </button>
-                        </div>
-                    </div>
-                `).join('');
-                
-                content.innerHTML = `
-                    <div class="files-grid">
-                        ${filesGrid}
-                    </div>
-                `;
-                
-            } catch (error) {
-                content.innerHTML = `
-                    <div class="empty-state">
-                        <h3>❌ Error loading files</h3>
-                        <p>${error.message}</p>
-                    </div>
-                `;
-            }
-        }
+
         
         function downloadFile(mediaId) {
             window.open(`${API_BASE}/storage/${mediaId}`, '_blank');
@@ -933,7 +868,7 @@
                 
                 if (response.ok) {
                     showNotification('🗑️ File deleted successfully!');
-                    refreshCurrentView();
+                    loadCombinedView();
                     loadStats();
                 } else {
                     showNotification('❌ Error deleting file', 'error');
@@ -945,9 +880,7 @@
         
         // Event listeners
         document.getElementById('typeFilter').addEventListener('change', () => {
-            if (currentViewMode === 'files') {
-                loadFiles();
-            }
+            loadCombinedView();
         });
         
         // Add enter key support for folder creation
@@ -959,7 +892,7 @@
         
         // Carregar dados iniciais
         loadStats();
-        loadFolderContents(); // Start with folder view
+        loadCombinedView(); // Start with combined view
     </script>
 </body>
 </html> 

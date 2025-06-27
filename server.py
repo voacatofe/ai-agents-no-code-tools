@@ -43,7 +43,7 @@ signal.signal(signal.SIGTERM, signal_handler)
 
 app = FastAPI()
 
-@app.get("/health")
+@app.get("/health", tags=["Health Check"])
 def read_root():
     return {"status": "ok"}
 
@@ -51,10 +51,10 @@ def read_root():
 
 
 
-@app.get("/files", response_class=HTMLResponse)
+@app.get("/files", response_class=HTMLResponse, tags=["File Manager"])
 def file_manager():
     """
-    Interface web para gerenciar arquivos.
+    Web interface for file management.
     """
     template_path = os.path.join(os.path.dirname(__file__), "templates", "file_manager.html")
     try:
@@ -71,7 +71,7 @@ def file_manager():
         """, status_code=404)
 
 
-@app.get("/templates/file_manager.css")
+@app.get("/templates/file_manager.css", tags=["File Manager"])
 def serve_file_manager_css():
     """
     Serve the CSS file for the file manager.
@@ -93,7 +93,7 @@ storage = Storage(
 )
 
 
-@v1_media_api_router.get("/audio-tools/tts/kokoro/languages")
+@v1_media_api_router.get("/audio-tools/tts/kokoro/languages", tags=["TTS - Text to Speech"])
 def get_kokoro_languages():
     """
     Get available Kokoro languages.
@@ -103,7 +103,7 @@ def get_kokoro_languages():
     return {"languages": languages}
 
 
-@v1_media_api_router.get("/audio-tools/tts/kokoro/voices")
+@v1_media_api_router.get("/audio-tools/tts/kokoro/voices", tags=["TTS - Text to Speech"])
 def get_kokoro_voices(lang_code: Optional[str] = None):
     """
     Get available Kokoro voices.
@@ -116,7 +116,7 @@ def get_kokoro_voices(lang_code: Optional[str] = None):
     return {"voices": voices, "language": lang_code or "all"}
 
 
-@v1_media_api_router.post("/audio-tools/tts/kokoro")
+@v1_media_api_router.post("/audio-tools/tts/kokoro", tags=["TTS - Text to Speech"])
 def generate_kokoro_tts(
     background_tasks: BackgroundTasks,
     text: str = Form(..., description="Text to convert to speech"),
@@ -155,7 +155,7 @@ def generate_kokoro_tts(
     return {"file_id": audio_id}
 
 
-@v1_media_api_router.post("/audio-tools/tts/chatterbox")
+@v1_media_api_router.post("/audio-tools/tts/chatterbox", tags=["TTS - Text to Speech"])
 def generate_chatterbox_tts(
     background_tasks: BackgroundTasks,
     text: str = Form(..., description="Text to convert to speech"),
@@ -230,7 +230,7 @@ def generate_chatterbox_tts(
     return {"file_id": audio_id}
 
 
-@v1_media_api_router.post("/storage")
+@v1_media_api_router.post("/storage", tags=["File Storage"])
 def upload_file(
     file: Optional[UploadFile] = File(None, description="File to upload"),
     url: Optional[str] = Form(None, description="URL of the file to upload (optional)"),
@@ -283,15 +283,15 @@ def upload_file(
         return {"file_id": file_id}
 
 
-# Endpoints específicos PRIMEIRO (ordem importa no FastAPI!)
-@v1_media_api_router.get("/storage/list")
+# Specific endpoints FIRST (order matters in FastAPI!)
+@v1_media_api_router.get("/storage/list", tags=["File Storage"])
 def list_files(media_type: Optional[str] = None, limit: Optional[int] = None):
     """
-    Lista arquivos armazenados no sistema.
+    List stored files in the system.
     
     Args:
-        media_type: Filtrar por tipo (image, video, audio)
-        limit: Limitar número de resultados
+        media_type: Filter by type (image, video, audio)
+        limit: Limit number of results
     """
     try:
         files = storage.list_media(media_type)
@@ -307,14 +307,14 @@ def list_files(media_type: Optional[str] = None, limit: Optional[int] = None):
     except Exception as e:
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"error": f"Erro ao listar arquivos: {str(e)}"}
+            content={"error": f"Error listing files: {str(e)}"}
         )
 
 
-@v1_media_api_router.get("/storage/stats")
+@v1_media_api_router.get("/storage/stats", tags=["File Storage"])
 def get_storage_stats():
     """
-    Obtém estatísticas gerais do storage.
+    Get general storage statistics.
     """
     try:
         stats = storage.get_storage_stats()
@@ -322,15 +322,15 @@ def get_storage_stats():
     except Exception as e:
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"error": f"Erro ao obter estatísticas: {str(e)}"}
+            content={"error": f"Error getting statistics: {str(e)}"}
         )
 
 
-# Endpoints com parâmetros DEPOIS
-@v1_media_api_router.get("/storage/{file_id}/info")
+# Endpoints with parameters AFTER
+@v1_media_api_router.get("/storage/{file_id}/info", tags=["File Storage"])
 def get_file_info(file_id: str):
     """
-    Obtém informações detalhadas sobre um arquivo específico.
+    Get detailed information about a specific file.
     """
     try:
         info = storage.get_media_info(file_id)
@@ -338,16 +338,16 @@ def get_file_info(file_id: str):
     except FileNotFoundError:
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
-            content={"error": f"Arquivo {file_id} não encontrado"}
+            content={"error": f"File {file_id} not found"}
         )
     except Exception as e:
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"error": f"Erro ao obter informações: {str(e)}"}
+            content={"error": f"Error getting information: {str(e)}"}
         )
 
 
-@v1_media_api_router.get("/storage/{file_id}/status")
+@v1_media_api_router.get("/storage/{file_id}/status", tags=["File Storage"])
 def file_status(file_id: str):
     """
     Check the status of a file by its ID.
@@ -360,7 +360,7 @@ def file_status(file_id: str):
     return {"status": "not_found"}
 
 
-@v1_media_api_router.get("/storage/{file_id}")
+@v1_media_api_router.get("/storage/{file_id}", tags=["File Storage"])
 def download_file(file_id: str):
     """
     Download a file by its ID.
@@ -381,10 +381,10 @@ def download_file(file_id: str):
     )
 
 
-@v1_media_api_router.delete("/storage/{file_id}")
+@v1_media_api_router.delete("/storage/{file_id}", tags=["File Storage"])
 def delete_file(file_id: str):
     """
-    Delete a file by its
+    Delete a file by its ID.
     """
     if storage.media_exists(file_id):
         storage.delete_media(file_id)
@@ -393,7 +393,7 @@ def delete_file(file_id: str):
 
 # ==================== FOLDER MANAGEMENT ENDPOINTS ====================
 
-@v1_media_api_router.get("/folders")
+@v1_media_api_router.get("/folders", tags=["Folder Management"])
 def list_folders(parent_folder: Optional[str] = None):
     """
     List folders in the system.
@@ -415,7 +415,7 @@ def list_folders(parent_folder: Optional[str] = None):
         )
 
 
-@v1_media_api_router.post("/folders")
+@v1_media_api_router.post("/folders", tags=["Folder Management"])
 def create_folder(
     folder_name: str = Form(..., description="Name of the folder to create"),
     parent_folder: Optional[str] = Form("", description="Parent folder path")
@@ -453,7 +453,7 @@ def create_folder(
         )
 
 
-@v1_media_api_router.delete("/folders/{folder_path:path}")
+@v1_media_api_router.delete("/folders/{folder_path:path}", tags=["Folder Management"])
 def delete_folder(folder_path: str):
     """
     Delete a folder and all its contents.
@@ -485,7 +485,7 @@ def delete_folder(folder_path: str):
         )
 
 
-@v1_media_api_router.get("/folders/root/contents")
+@v1_media_api_router.get("/folders/root/contents", tags=["Folder Management"])
 def get_root_folder_contents():
     """
     Get contents of the root folder.
@@ -500,7 +500,7 @@ def get_root_folder_contents():
         )
 
 
-@v1_media_api_router.get("/folders/{folder_path:path}/contents")
+@v1_media_api_router.get("/folders/{folder_path:path}/contents", tags=["Folder Management"])
 def get_folder_contents(folder_path: str):
     """
     Get contents of a specific folder (subfolders and files).
@@ -521,7 +521,7 @@ def get_folder_contents(folder_path: str):
 
 
 
-@v1_media_api_router.post("/video-tools/merge")
+@v1_media_api_router.post("/video-tools/merge", tags=["Video Tools"])
 def merge_videos(
     background_tasks: BackgroundTasks,
     video_ids: str = Form(..., description="List of video IDs to merge"),
@@ -585,7 +585,7 @@ def merge_videos(
     return {"file_id": merged_video_id}
 
 
-@v1_media_api_router.post("/video-tools/generate/tts-captioned-video")
+@v1_media_api_router.post("/video-tools/generate/tts-captioned-video", tags=["Video Tools"])
 def generate_captioned_video(
     background_tasks: BackgroundTasks,
     background_id: str = Form(..., description="Background image ID"),

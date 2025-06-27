@@ -634,6 +634,31 @@ class Storage:
             count += len(files)
         return count
     
+    def _detect_media_type_from_extension(self, file_extension: str) -> str:
+        """
+        Detecta o tipo de mídia baseado na extensão do arquivo.
+        
+        Args:
+            file_extension (str): Extensão do arquivo (com ou sem ponto)
+            
+        Returns:
+            str: Tipo de mídia detectado
+        """
+        ext = file_extension.lower().lstrip('.')
+        
+        image_extensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'tiff', 'ico']
+        video_extensions = ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv', 'm4v', '3gp', 'ogv']
+        audio_extensions = ['mp3', 'wav', 'ogg', 'aac', 'm4a', 'flac', 'wma', 'opus', 'aiff']
+        
+        if ext in image_extensions:
+            return MediaType.IMAGE
+        elif ext in video_extensions:
+            return MediaType.VIDEO
+        elif ext in audio_extensions:
+            return MediaType.AUDIO
+        else:
+            return MediaType.IMAGE  # fallback
+    
 
     
 
@@ -676,16 +701,30 @@ class Storage:
                     "file_count": self._count_files_in_folder(os.path.join(folder_path, item) if folder_path else item)
                 })
             elif os.path.isfile(item_path):
-                # Listar arquivos
+                # Listar arquivos  
                 stat = os.stat(item_path)
+                
+                # Detectar media_type baseado na extensão
+                file_ext = os.path.splitext(item)[1].lower()
+                media_type = self._detect_media_type_from_extension(file_ext)
+                
+                # Gerar media_id correto para arquivos em pastas
+                if folder_path:
+                    media_id = f"folder_{folder_path.replace('/', '_')}_{media_type}_{item}"
+                else:
+                    media_id = f"{media_type}_{item}"
+                
                 result["files"].append({
+                    "media_id": media_id,
+                    "media_type": media_type,
                     "name": item,
+                    "filename": item,
                     "path": os.path.join(folder_path, item) if folder_path else item,
                     "size_bytes": stat.st_size,
                     "size_mb": round(stat.st_size / (1024 * 1024), 2),
                     "created_at": stat.st_ctime,
                     "modified_at": stat.st_mtime,
-                    "file_extension": os.path.splitext(item)[1].lower()
+                    "file_extension": file_ext
                 })
         
         # Ordenar

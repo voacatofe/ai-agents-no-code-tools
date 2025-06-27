@@ -476,7 +476,7 @@ class Storage:
     
     def get_storage_stats(self) -> dict:
         """
-        Obtém estatísticas gerais do storage.
+        Obtém estatísticas gerais do storage incluindo TODAS as pastas.
         
         Returns:
             dict: Estatísticas do storage
@@ -488,22 +488,81 @@ class Storage:
             "by_type": {}
         }
         
+        # Inicializar contadores por tipo
+        for media_type in [MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO, MediaType.TMP]:
+            stats["by_type"][media_type] = {
+                "count": 0,
+                "size_bytes": 0,
+                "size_mb": 0
+            }
+        
+        # 1. Contar arquivos das pastas padrão (image, video, audio, tmp)
         for media_type in [MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO, MediaType.TMP]:
             files = self.list_media(media_type)
             count = len(files)
             size = sum(f["size_bytes"] for f in files)
             
-            stats["by_type"][media_type] = {
-                "count": count,
-                "size_bytes": size,
-                "size_mb": round(size / (1024 * 1024), 2)
-            }
+            stats["by_type"][media_type]["count"] += count
+            stats["by_type"][media_type]["size_bytes"] += size
+            stats["by_type"][media_type]["size_mb"] = round(stats["by_type"][media_type]["size_bytes"] / (1024 * 1024), 2)
             
             stats["total_files"] += count
             stats["total_size_bytes"] += size
+        
+        # 2. Contar arquivos de TODAS as pastas personalizadas
+        folders_path = os.path.join(self.storage_path, "folders")
+        if os.path.exists(folders_path):
+            self._count_files_in_all_folders(folders_path, "", stats)
             
         stats["total_size_mb"] = round(stats["total_size_bytes"] / (1024 * 1024), 2)
         return stats
+    
+    def _count_files_in_all_folders(self, base_path: str, current_path: str, stats: dict):
+        """
+        Recursivamente conta arquivos em todas as pastas e subpastas.
+        
+        Args:
+            base_path (str): Caminho base das pastas
+            current_path (str): Caminho atual relativo
+            stats (dict): Dicionário de estatísticas para atualizar
+        """
+        try:
+            if current_path:
+                full_path = os.path.join(base_path, current_path)
+            else:
+                full_path = base_path
+                
+            if not os.path.exists(full_path):
+                return
+                
+            for item in os.listdir(full_path):
+                item_path = os.path.join(full_path, item)
+                
+                if os.path.isfile(item_path):
+                    # É um arquivo - contar nas estatísticas
+                    try:
+                        stat = os.stat(item_path)
+                        file_ext = os.path.splitext(item)[1].lower()
+                        media_type = self._detect_media_type_from_extension(file_ext)
+                        
+                        # Incrementar contadores
+                        stats["by_type"][media_type]["count"] += 1
+                        stats["by_type"][media_type]["size_bytes"] += stat.st_size
+                        stats["by_type"][media_type]["size_mb"] = round(stats["by_type"][media_type]["size_bytes"] / (1024 * 1024), 2)
+                        
+                        stats["total_files"] += 1
+                        stats["total_size_bytes"] += stat.st_size
+                        
+                    except Exception as e:
+                        print(f"Erro ao processar arquivo {item}: {e}")
+                        
+                elif os.path.isdir(item_path):
+                    # É uma pasta - recursão para contar subpastas
+                    new_path = os.path.join(current_path, item) if current_path else item
+                    self._count_files_in_all_folders(base_path, new_path, stats)
+                    
+        except Exception as e:
+            print(f"Erro ao processar pasta {current_path}: {e}")
     
     def _create_default_folders(self):
         """

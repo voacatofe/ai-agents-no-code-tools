@@ -439,14 +439,34 @@ def download_file(file_id: str):
     )
 
 
+@v1_media_api_router.delete("/storage/{folder_path:path}/{file_id}", tags=["File Storage"])
 @v1_media_api_router.delete("/storage/{file_id}", tags=["File Storage"])
-def delete_file(file_id: str):
+def delete_file(file_id: str, folder_path: Optional[str] = None):
     """
     Delete a file by its ID.
+    
+    Args:
+        file_id: File ID to delete
+        folder_path: Folder path where the file is located (optional)
     """
-    if storage.media_exists(file_id):
-        storage.delete_media(file_id)
-    return {"status": "success"}
+    if folder_path:
+        # For files in folders, construct the expected media_id format
+        if not file_id.startswith("folder_"):
+            folder_clean = folder_path.replace('/', '_')
+            expected_file_id = f"folder_{folder_clean}_{file_id}"
+        else:
+            expected_file_id = file_id
+    else:
+        expected_file_id = file_id
+    
+    if storage.media_exists(expected_file_id):
+        storage.delete_media(expected_file_id)
+        return {"status": "success", "file_id": expected_file_id}
+    else:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"error": f"File {expected_file_id} not found"}
+        )
 
 
 # ==================== FOLDER MANAGEMENT ENDPOINTS ====================

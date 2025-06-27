@@ -173,9 +173,9 @@ class Storage:
         ):
             raise ValueError("Custom name contains invalid characters")
 
-        # Usar nome customizado se fornecido, senão gerar UUID único
+        # Use custom name if provided, otherwise generate unique UUID
         if custom_name:
-            # Sanificar nome customizado para segurança
+            # Sanitize custom name for security
             safe_name = self._sanitize_filename(custom_name)
             filename = f"{safe_name}{file_extension}" if file_extension else safe_name
         else:
@@ -306,9 +306,9 @@ class Storage:
         ):
             raise ValueError("Custom name contains invalid characters")
 
-        # Usar nome customizado se fornecido, senão gerar UUID único
+        # Use custom name if provided, otherwise generate unique UUID
         if custom_name:
-            # Sanificar nome customizado para segurança
+            # Sanitize custom name for security
             safe_name = self._sanitize_filename(custom_name)
             filename = f"{safe_name}{file_extension}" if file_extension else safe_name
         else:
@@ -588,7 +588,7 @@ class Storage:
             "by_type": {}
         }
         
-        # Inicializar contadores por tipo
+        # Initialize counters by type
         for media_type in [MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO, MediaType.TMP]:
             stats["by_type"][media_type] = {
                 "count": 0,
@@ -596,7 +596,7 @@ class Storage:
                 "size_mb": 0
             }
         
-        # 1. Contar arquivos das pastas padrão (image, video, audio, tmp)
+        # 1. Count files from default folders (image, video, audio, tmp)
         for media_type in [MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO, MediaType.TMP]:
             files = self.list_media(media_type)
             count = len(files)
@@ -609,7 +609,7 @@ class Storage:
             stats["total_files"] += count
             stats["total_size_bytes"] += size
         
-        # 2. Contar arquivos de TODAS as pastas personalizadas
+        # 2. Count files from ALL custom folders
         folders_path = os.path.join(self.storage_path, "folders")
         if os.path.exists(folders_path):
             self._count_files_in_all_folders(folders_path, "", stats)
@@ -811,9 +811,9 @@ class Storage:
         Returns:
             int: Number of files in the folder
         """
-        # Converter ID normalizado para nome real se necessário
+        # Convert normalized ID to real name if necessary
         if folder_path:
-            # Se contém '/', é um caminho - mapear cada parte
+            # If contains '/', it's a path - map each part
             if '/' in folder_path:
                 path_parts = folder_path.split('/')
                 real_parts = []
@@ -826,7 +826,7 @@ class Storage:
                 
                 folder_path = '/'.join(real_parts)
             else:
-                # É uma pasta única
+                # It's a single folder
                 folder_path = self._get_folder_name_from_id(folder_path)
         
         full_path = os.path.join(self.storage_path, "folders", folder_path)
@@ -999,9 +999,9 @@ class Storage:
         Returns:
             dict: Dictionary with folders and files
         """
-        # Converter ID normalizado para nome real se necessário
+        # Convert normalized ID to real name if necessary
         if folder_path:
-            # Se contém '/', é um caminho - mapear cada parte
+            # If contains '/', it's a path - map each part
             if '/' in folder_path:
                 path_parts = folder_path.split('/')
                 real_parts = []
@@ -1014,7 +1014,7 @@ class Storage:
                 
                 folder_path = '/'.join(real_parts)
             else:
-                # É uma pasta única
+                # It's a single folder
                 folder_path = self._get_folder_name_from_id(folder_path)
         
         if folder_path:

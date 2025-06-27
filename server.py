@@ -253,6 +253,20 @@ def upload_file(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"error": f"Invalid media type: {media_type}"},
         )
+    
+    # Mapeamento de nomes alternativos de pastas para compatibilidade com N8N
+    if folder_path:
+        folder_aliases = {
+            "background_music": "Background Music",
+            "Background_Music": "Background Music",
+            "backgroundmusic": "Background Music",
+            "temp": "temp",
+            "temporary": "temp",
+            "tmp": "temp"
+        }
+        # Usar o nome correto da pasta se houver um alias
+        folder_path = folder_aliases.get(folder_path, folder_path)
+    
     if file:
         if folder_path:
             file_id = storage.upload_media_to_folder(
@@ -587,7 +601,28 @@ def get_folder_contents(folder_path: str):
         folder_path: Path of the folder to explore
     """
     try:
+        # Mapeamento de nomes alternativos de pastas para compatibilidade com N8N
+        folder_aliases = {
+            "background_music": "Background Music",
+            "Background_Music": "Background Music",
+            "backgroundmusic": "Background Music",
+            "temp": "temp",
+            "temporary": "temp",
+            "tmp": "temp"
+        }
+        
+        # Verificar se existe um alias para o folder_path
+        actual_folder_path = folder_aliases.get(folder_path, folder_path)
+        
+        # Tentar primeiro com o nome original
         contents = storage.list_folder_contents(folder_path)
+        
+        # Se não encontrar arquivos e há um alias diferente, tentar com o alias
+        if (not contents.get("files") and not contents.get("folders")) and actual_folder_path != folder_path:
+            contents = storage.list_folder_contents(actual_folder_path)
+            # Atualizar o current_path para o nome real da pasta
+            contents["current_path"] = actual_folder_path
+            
         return contents
     except Exception as e:
         return JSONResponse(

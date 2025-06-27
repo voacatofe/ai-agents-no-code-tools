@@ -106,6 +106,7 @@ def generate_kokoro_tts(
     text: str = Form(..., description="Text to convert to speech"),
     voice: Optional[str] = Form(None, description="Voice name for kokoro TTS"),
     speed: Optional[float] = Form(None, description="Speed for kokoro TTS"),
+    name: Optional[str] = Form(None, description="Custom name for the audio file (optional)")
 ):
     """
     Generate audio from text using specified TTS engine.
@@ -120,7 +121,7 @@ def generate_kokoro_tts(
             content={"error": f"Invalid voice: {voice}. Valid voices: {voices}"},
         )
     audio_id, audio_path = storage.create_media_filename_with_id(
-        media_type="audio", file_extension=".wav"
+        media_type="audio", file_extension=".wav", custom_name=name
     )
     tmp_file_id = storage.create_tmp_file(audio_id)
 
@@ -160,9 +161,15 @@ def generate_chatterbox_tts(
     Generate audio from text using Chatterbox TTS.
     """
     tts_manager = TTS()
-    audio_id, audio_path = storage.create_media_filename_with_id(
-        media_type="audio", file_extension=".wav"
-    )
+    
+    # Create file in temp folder (intermediate file)
+    import uuid
+    asset_id = str(uuid.uuid4())
+    filename = f"{asset_id}.wav"
+    temp_folder_path = os.path.join(storage.storage_path, "folders", "temp")
+    os.makedirs(temp_folder_path, exist_ok=True)
+    audio_path = os.path.join(temp_folder_path, filename)
+    audio_id = f"folder_temp_audio_{filename}"
 
     sample_audio_path = None
     if sample_audio_file:
@@ -214,6 +221,7 @@ def upload_file(
     media_type: Literal["image", "video", "audio"] = Form(
         ..., description="Type of media being uploaded"
     ),
+    name: Optional[str] = Form(None, description="Custom name for the file (optional)")
 ):
     """
     Upload a file and return its ID.
@@ -228,6 +236,7 @@ def upload_file(
             media_type=media_type,
             media_data=file.file.read(),
             file_extension=os.path.splitext(file.filename)[1],
+            custom_name=name
         )
 
         return {"file_id": file_id}
@@ -237,7 +246,24 @@ def upload_file(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={"error": f"Invalid URL: {url}"},
             )
-        file_id = storage.upload_media_from_url(media_type=media_type, url=url)
+        file_extension = os.path.splitext(url)[1]
+        if name:
+            # Para URL, fazer download e upload com nome customizado
+            import requests
+            response = requests.get(url)
+            if response.status_code != 200:
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content={"error": f"Failed to download media from {url}"}
+                )
+            file_id = storage.upload_media(
+                media_type=media_type,
+                media_data=response.content,
+                file_extension=file_extension,
+                custom_name=name
+            )
+        else:
+            file_id = storage.upload_media_from_url(media_type=media_type, url=url)
         return {"file_id": file_id}
 
 
@@ -527,6 +553,7 @@ def merge_videos(
     background_music_volume: Optional[float] = Form(
         0.5, description="Volume for background music (0.0 to 1.0)"
     ),
+    name: Optional[str] = Form(None, description="Custom name for the merged video (optional)")
 ):
     """
     Merge multiple videos into one.
@@ -539,7 +566,7 @@ def merge_videos(
         )
 
     merged_video_id, merged_video_path = storage.create_media_filename_with_id(
-        media_type="video", file_extension=".mp4"
+        media_type="video", file_extension=".mp4", custom_name=name
     )
 
     video_paths = []
@@ -598,6 +625,7 @@ def generate_captioned_video(
     kokoro_speed: Optional[float] = Form(
         1.0, description="Speed for kokoro TTS (default: 1.0)"
     ),
+    name: Optional[str] = Form(None, description="Custom name for the video (optional)")
 ):
     """
     Generate a captioned video from text and background image.
@@ -627,7 +655,7 @@ def generate_captioned_video(
         )
 
     output_id, output_path = storage.create_media_filename_with_id(
-        media_type="video", file_extension=".mp4"
+        media_type="video", file_extension=".mp4", custom_name=name
     )
     dimensions = (width, height)
     builder = VideoBuilder(
@@ -641,6 +669,11 @@ def generate_captioned_video(
         tmp_file_id: str = tmp_file_id,
     ):
         tmp_file_ids = [tmp_file_id]
+        
+        # Setup temp folder path for intermediate files
+        import uuid
+        temp_folder_path = os.path.join(storage.storage_path, "folders", "temp")
+        os.makedirs(temp_folder_path, exist_ok=True)
 
         # set audio, generate captions
         captions = None
@@ -656,9 +689,14 @@ def generate_captioned_video(
             builder.set_audio(audio_path)
         # generate TTS and set audio
         else:
-            tts_audio_id, audio_path = storage.create_media_filename_with_id(
-                media_type="audio", file_extension=".wav"
-            )
+            # Create TTS audio in temp folder (intermediate file)
+            import uuid
+            asset_id = str(uuid.uuid4())
+            filename = f"{asset_id}.wav"
+            temp_folder_path = os.path.join(storage.storage_path, "folders", "temp")
+            os.makedirs(temp_folder_path, exist_ok=True)
+            audio_path = os.path.join(temp_folder_path, filename)
+            tts_audio_id = f"folder_temp_audio_{filename}"
             tmp_file_ids.append(tts_audio_id)
             
             # Gera o áudio TTS
@@ -691,9 +729,11 @@ def generate_captioned_video(
 
         # create subtitle
         captionsManager = Caption()
-        subtitle_id, subtitle_path = storage.create_media_filename_with_id(
-            media_type="tmp", file_extension=".ass"
-        )
+        # Create subtitle in temp folder (intermediate file)
+        subtitle_asset_id = str(uuid.uuid4())
+        subtitle_filename = f"{subtitle_asset_id}.ass"
+        subtitle_path = os.path.join(temp_folder_path, subtitle_filename)
+        subtitle_id = f"folder_temp_tmp_{subtitle_filename}"
         tmp_file_ids.append(subtitle_id)
         segments = captionsManager.create_subtitle_segments_english(
             captions=captions,

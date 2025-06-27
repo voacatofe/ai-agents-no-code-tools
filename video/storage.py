@@ -86,7 +86,7 @@ class Storage:
         return file_path
 
     def upload_media(
-        self, media_type: MediaType, media_data: bytes, file_extension: str = ""
+        self, media_type: MediaType, media_data: bytes, file_extension: str = "", custom_name: str = ""
     ) -> str:
         """
         Uploads media to the server.
@@ -109,9 +109,22 @@ class Storage:
             ".." in file_extension or "/" in file_extension or "\\" in file_extension
         ):
             raise ValueError("File extension contains invalid characters")
+        
+        # Validate custom name to prevent path traversal
+        if custom_name and (
+            ".." in custom_name or "/" in custom_name or "\\" in custom_name
+        ):
+            raise ValueError("Custom name contains invalid characters")
 
-        asset_id = str(uuid.uuid4())
-        filename = f"{asset_id}{file_extension}" if file_extension else asset_id
+        # Use custom name if provided, otherwise generate UUID
+        if custom_name:
+            # Remove any existing extension from custom_name to avoid double extensions
+            name_without_ext = os.path.splitext(custom_name)[0]
+            filename = f"{name_without_ext}{file_extension}" if file_extension else name_without_ext
+        else:
+            asset_id = str(uuid.uuid4())
+            filename = f"{asset_id}{file_extension}" if file_extension else asset_id
+            
         file_path = os.path.join(self.storage_path, media_type, filename)
 
         # Additional safety check
@@ -206,10 +219,44 @@ class Storage:
         return f"{media_type}_{filename}"
 
     def create_media_filename_with_id(
-        self, media_type: MediaType, file_extension: str = ""
+        self, media_type: MediaType, file_extension: str = "", custom_name: str = ""
     ) -> Tuple[str, str]:
-        file_id = self.create_media_filename(media_type, file_extension)
+        if custom_name:
+            file_id = self.create_media_filename_with_custom_name(media_type, file_extension, custom_name)
+        else:
+            file_id = self.create_media_filename(media_type, file_extension)
         return file_id, self.get_media_path(file_id)
+    
+    def create_media_filename_with_custom_name(
+        self, media_type: MediaType, file_extension: str = "", custom_name: str = ""
+    ) -> str:
+        # Validate media type
+        valid_types = [MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO, MediaType.TMP]
+        if media_type not in valid_types:
+            raise ValueError(f"Invalid media type: {media_type}")
+
+        # Validate file extension to prevent path traversal
+        if file_extension and (
+            ".." in file_extension or "/" in file_extension or "\\" in file_extension
+        ):
+            raise ValueError("File extension contains invalid characters")
+        
+        # Validate custom name to prevent path traversal
+        if custom_name and (
+            ".." in custom_name or "/" in custom_name or "\\" in custom_name
+        ):
+            raise ValueError("Custom name contains invalid characters")
+
+        # Use custom name if provided, otherwise generate UUID
+        if custom_name:
+            # Remove any existing extension from custom_name to avoid double extensions
+            name_without_ext = os.path.splitext(custom_name)[0]
+            filename = f"{name_without_ext}{file_extension}" if file_extension else name_without_ext
+        else:
+            asset_id = str(uuid.uuid4())
+            filename = f"{asset_id}{file_extension}" if file_extension else asset_id
+            
+        return f"{media_type}_{filename}"
 
     def create_tmp_file_id(self, media_id: str) -> str:
         """
@@ -407,7 +454,7 @@ class Storage:
         """
         Cria pastas padrão no sistema.
         """
-        default_folders = ["temp"]
+        default_folders = ["temp", "Background Music"]
         for folder_name in default_folders:
             self.create_folder(folder_name)
     

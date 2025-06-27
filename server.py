@@ -244,7 +244,7 @@ def upload_file(
 ):
     """
     Upload a file and return its ID.
-    Aceita tanto nomes reais quanto IDs normalizados de pastas.
+    Accepts both real names and normalized folder IDs.
     
     Args:
         folder_path: Target folder path (nome real ou ID normalizado). Optional - if not provided, saves to default media folders.

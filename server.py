@@ -567,45 +567,7 @@ def get_folder_contents(folder_path: str):
         )
 
 
-@v1_media_api_router.post("/folders/{folder_path:path}/upload")
-def upload_file_to_folder(
-    folder_path: str,
-    file: UploadFile = File(..., description="File to upload"),
-    media_type: Literal["image", "video", "audio"] = Form(..., description="Type of media being uploaded")
-):
-    """
-    Upload a file to a specific folder.
-    
-    Args:
-        folder_path: Path of the folder to upload to
-        file: File to upload
-        media_type: Type of media being uploaded
-    """
-    try:
-        if media_type not in ["image", "video", "audio"]:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={"error": f"Invalid media type: {media_type}"}
-            )
-        
-        file_id = storage.upload_media_to_folder(
-            media_type=media_type,
-            media_data=file.file.read(),
-            file_extension=os.path.splitext(file.filename)[1],
-            folder_path=folder_path
-        )
-        
-        return {
-            "file_id": file_id,
-            "filename": file.filename,
-            "folder_path": folder_path,
-            "media_type": media_type
-        }
-    except Exception as e:
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"error": f"Error uploading file to folder: {str(e)}"}
-        )
+
 
 
 @v1_media_api_router.post("/video-tools/merge")

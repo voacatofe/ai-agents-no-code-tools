@@ -579,85 +579,11 @@ class Storage:
             count += len(files)
         return count
     
-    def upload_media_to_folder(self, media_type: str, media_data: bytes, 
-                              file_extension: str = "", folder_path: str = "") -> str:
-        """
-        Faz upload de mídia para uma pasta específica.
-        
-        Args:
-            media_type (str): Tipo de mídia
-            media_data (bytes): Dados binários do arquivo
-            file_extension (str): Extensão do arquivo
-            folder_path (str): Caminho da pasta de destino
-            
-        Returns:
-            str: Media ID do arquivo criado
-        """
-        # Validar tipo de mídia
-        valid_types = [MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO, MediaType.TMP]
-        if media_type not in valid_types:
-            raise ValueError(f"Invalid media type: {media_type}")
-        
-        # Validar extensão
-        if file_extension and (
-            ".." in file_extension or "/" in file_extension or "\\" in file_extension
-        ):
-            raise ValueError("File extension contains invalid characters")
-        
-        # Criar ID e nome do arquivo
-        asset_id = str(uuid.uuid4())
-        filename = f"{asset_id}{file_extension}" if file_extension else asset_id
-        
-        # Determinar caminho do arquivo
-        if folder_path:
-            # Criar pasta se não existe
-            folder_full_path = os.path.join(self.storage_path, "folders", folder_path)
-            os.makedirs(folder_full_path, exist_ok=True)
-            file_path = os.path.join(folder_full_path, filename)
-            media_id = f"folder_{folder_path.replace('/', '_')}_{media_type}_{filename}"
-        else:
-            file_path = os.path.join(self.storage_path, media_type, filename)
-            media_id = f"{media_type}_{filename}"
-        
-        # Verificação de segurança
-        resolved_path = os.path.abspath(file_path)
-        storage_abs_path = os.path.abspath(self.storage_path)
-        if not resolved_path.startswith(storage_abs_path):
-            raise ValueError("Path traversal attempt detected")
-        
-        # Escrever arquivo
-        with open(file_path, "wb") as f:
-            f.write(media_data)
-        
-        return media_id
+
     
-    def get_media_from_folder(self, media_id: str) -> bytes:
-        """
-        Recupera mídia de pasta.
-        """
-        file_path = self._get_folder_file_path(media_id)
-        
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"Media file {media_id} not found.")
-        
-        with open(file_path, "rb") as f:
-            return f.read()
+
     
-    def _get_folder_file_path(self, media_id: str) -> str:
-        """
-        Obtém caminho do arquivo em pasta.
-        """
-        if media_id.startswith("folder_"):
-            # Formato: folder_{folder_path}_{media_type}_{filename}
-            parts = media_id.split("_", 3)
-            if len(parts) >= 4:
-                folder_path = parts[1].replace("_", "/")
-                media_type = parts[2]
-                filename = parts[3]
-                return os.path.join(self.storage_path, "folders", folder_path, filename)
-        
-        # Fallback para arquivos normais
-        return self._get_safe_file_path(media_id)
+
     
     def list_folder_contents(self, folder_path: str = "") -> dict:
         """

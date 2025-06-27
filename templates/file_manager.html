@@ -480,11 +480,8 @@
             formData.append('file', item.file);
             formData.append('media_type', item.mediaType);
             
-            // Choose upload endpoint based on current folder
-            let url = `${API_BASE}/storage`;
-            if (currentFolder) {
-                url = `${API_BASE}/folders/${encodeURIComponent(currentFolder)}/upload`;
-            }
+            // Always use main storage endpoint
+            const url = `${API_BASE}/storage`;
             
             const response = await fetch(url, {
                 method: 'POST',

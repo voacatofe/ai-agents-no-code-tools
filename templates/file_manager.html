@@ -1,559 +1,17 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>File Manager - AI Agents Tools</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f7fa;
-            color: #333;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .header {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
-        
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .stat-card {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        
-        .stat-number {
-            font-size: 2em;
-            font-weight: bold;
-            color: #4f46e5;
-        }
-        
-        .controls {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: all 0.2s;
-        }
-        
-        .btn-primary {
-            background: #4f46e5;
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            background: #3f37c9;
-        }
-        
-        .btn-secondary {
-            background: #6b7280;
-            color: white;
-        }
-        
-        .btn-secondary:hover {
-            background: #4b5563;
-        }
-        
-        .btn-danger {
-            background: #ef4444;
-            color: white;
-        }
-        
-        .btn-danger:hover {
-            background: #dc2626;
-        }
-        
-        select {
-            padding: 10px;
-            border: 1px solid #d1d5db;
-            border-radius: 8px;
-            background: white;
-        }
-        
-        .files-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 20px;
-        }
-        
-        .file-card {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            transition: transform 0.2s;
-        }
-        
-        .file-card:hover {
-            transform: translateY(-2px);
-        }
-        
-        .file-type {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.8em;
-            font-weight: bold;
-            text-transform: uppercase;
-            margin-bottom: 10px;
-        }
-        
-        .type-image { background: #dbeafe; color: #1d4ed8; }
-        .type-video { background: #fecaca; color: #dc2626; }
-        .type-audio { background: #dcfce7; color: #16a34a; }
-        
-        .file-name {
-            font-weight: 600;
-            margin-bottom: 8px;
-            word-break: break-all;
-        }
-        
-        .file-info {
-            font-size: 0.9em;
-            color: #6b7280;
-            margin-bottom: 15px;
-        }
-        
-        .file-actions {
-            display: flex;
-            gap: 10px;
-        }
-        
-        .btn-small {
-            padding: 6px 12px;
-            font-size: 0.8em;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 40px;
-        }
-        
-        .spinner {
-            border: 3px solid #f3f4f6;
-            border-top: 3px solid #4f46e5;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .empty-state {
-            text-align: center;
-            padding: 40px;
-            color: #6b7280;
-        }
-        
-        .upload-progress {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-            display: none;
-        }
-        
-        .progress-bar {
-            width: 100%;
-            height: 20px;
-            background: #f3f4f6;
-            border-radius: 10px;
-            overflow: hidden;
-            margin: 10px 0;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: #4f46e5;
-            width: 0%;
-            transition: width 0.3s ease;
-        }
-        
-        .upload-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 0;
-            border-bottom: 1px solid #e5e7eb;
-        }
-        
-        .upload-item:last-child {
-            border-bottom: none;
-        }
-        
-        .upload-status {
-            font-size: 0.9em;
-            font-weight: 500;
-        }
-        
-        .status-uploading { color: #4f46e5; }
-        .status-success { color: #16a34a; }
-        .status-error { color: #ef4444; }
-        
-        .notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 20px;
-            border-radius: 8px;
-            color: white;
-            font-weight: 500;
-            z-index: 1000;
-            opacity: 0;
-            transform: translateY(-20px);
-            transition: all 0.3s ease;
-        }
-        
-        .notification.show {
-            opacity: 1;
-            transform: translateY(0);
-        }
-        
-        .notification.success { background: #16a34a; }
-        .notification.error { background: #ef4444; }
-        
-        .breadcrumb {
-            background: white;
-            padding: 15px 20px;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .breadcrumb-item {
-            color: #6b7280;
-            cursor: pointer;
-            transition: color 0.2s;
-        }
-        
-        .breadcrumb-item:hover {
-            color: #4f46e5;
-        }
-        
-        .breadcrumb-item.active {
-            color: #4f46e5;
-            font-weight: 600;
-        }
-        
-        .breadcrumb-separator {
-            color: #d1d5db;
-        }
-        
-        .folder-card {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            transition: transform 0.2s;
-            cursor: pointer;
-            border-left: 4px solid #f59e0b;
-        }
-        
-        .folder-card:hover {
-            transform: translateY(-2px);
-        }
-        
-        .folder-icon {
-            font-size: 2em;
-            margin-bottom: 10px;
-        }
-        
-        .folder-name {
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
-        
-        .folder-info {
-            font-size: 0.9em;
-            color: #6b7280;
-            margin-bottom: 15px;
-        }
-        
-        .folder-actions {
-            display: flex;
-            gap: 10px;
-        }
-        
-        .create-folder-form {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-            display: none;
-        }
-        
-        .form-row {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-        
-        .form-input {
-            flex: 1;
-            padding: 10px;
-            border: 1px solid #d1d5db;
-            border-radius: 8px;
-            background: white;
-        }
-        
-        .folder-view-toggle {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        
-        .view-mode {
-            padding: 8px 16px;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            background: white;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .view-mode.active {
-            background: #4f46e5;
-            color: white;
-            border-color: #4f46e5;
-        }
-        
-        /* Thumbnail Styles */
-        .file-thumbnail {
-            width: 100%;
-            height: 120px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            overflow: hidden;
-            position: relative;
-            background: #f3f4f6;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-        }
-        
-        .file-thumbnail img,
-        .file-thumbnail video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        
-        .file-thumbnail-icon {
-            font-size: 3rem;
-            color: #9ca3af;
-        }
-        
-        .file-thumbnail-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            transition: opacity 0.2s;
-        }
-        
-        .file-thumbnail:hover .file-thumbnail-overlay {
-            opacity: 1;
-        }
-        
-        .file-thumbnail-play {
-            color: white;
-            font-size: 2rem;
-        }
-        
-        /* Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.8);
-            backdrop-filter: blur(5px);
-        }
-        
-        .modal-content {
-            position: relative;
-            background: white;
-            margin: 5% auto;
-            padding: 0;
-            width: 90%;
-            max-width: 800px;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        }
-        
-        .modal-header {
-            padding: 20px;
-            border-bottom: 1px solid #e5e7eb;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .modal-title {
-            font-size: 1.2rem;
-            font-weight: 600;
-            margin: 0;
-        }
-        
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-            color: #6b7280;
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 6px;
-            transition: all 0.2s;
-        }
-        
-        .modal-close:hover {
-            background: #f3f4f6;
-            color: #374151;
-        }
-        
-        .modal-body {
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            background: #000;
-        }
-        
-        .modal-media {
-            width: 100%;
-            max-height: 60vh;
-            object-fit: contain;
-        }
-        
-        .modal-info {
-            padding: 20px;
-            background: white;
-            width: 100%;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-        }
-        
-        .modal-info-item {
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .modal-info-label {
-            font-size: 0.8rem;
-            color: #6b7280;
-            text-transform: uppercase;
-            margin-bottom: 4px;
-        }
-        
-        .modal-info-value {
-            font-weight: 500;
-            word-break: break-all;
-        }
-        
-        .modal-actions {
-            padding: 20px;
-            background: #f9fafb;
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        }
-        
-        .audio-player {
-            width: 100%;
-            padding: 40px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 20px;
-        }
-        
-        .audio-player audio {
-            width: 100%;
-            max-width: 400px;
-        }
-        
-        .audio-info {
-            text-align: center;
-            color: white;
-        }
-        
-        .audio-title {
-            font-size: 1.2rem;
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
-        
-        .audio-details {
-            opacity: 0.8;
-            font-size: 0.9rem;
-        }
-    </style>
+    <link rel="stylesheet" href="/templates/file_manager.css">
 </head>
 <body>
+    <!-- Theme Toggle -->
+    <div class="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode">
+        <span class="theme-icon">🌓</span>
+    </div>
+    
     <div class="container">
         <div class="header">
             <h1>🗂️ File Manager</h1>
@@ -641,6 +99,54 @@
         
         // Variáveis globais para sistema de pastas
         let currentFolder = '';
+        
+        // ==================== THEME FUNCTIONS ====================
+        
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            html.setAttribute('data-theme', newTheme);
+            
+            // Save preference to localStorage
+            localStorage.setItem('theme', newTheme);
+            
+            // Update theme toggle button
+            const toggle = document.querySelector('.theme-toggle');
+            const icon = toggle.querySelector('.theme-icon');
+            
+            if (newTheme === 'dark') {
+                icon.textContent = '🌙';
+                toggle.classList.add('active');
+            } else {
+                icon.textContent = '☀️';
+                toggle.classList.remove('active');
+            }
+            
+            showNotification(`🎨 Switched to ${newTheme} mode`);
+        }
+        
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const theme = savedTheme || (prefersDark ? 'dark' : 'light');
+            
+            document.documentElement.setAttribute('data-theme', theme);
+            
+            const toggle = document.querySelector('.theme-toggle');
+            const icon = toggle.querySelector('.theme-icon');
+            
+            if (theme === 'dark') {
+                icon.textContent = '🌙';
+                toggle.classList.add('active');
+            } else {
+                icon.textContent = '☀️';
+                toggle.classList.remove('active');
+            }
+        }
+        
+        // ==================== END THEME FUNCTIONS ====================
         
         // ==================== THUMBNAIL AND PREVIEW FUNCTIONS ====================
         
@@ -1303,6 +809,9 @@
                 createFolder();
             }
         });
+        
+        // Inicializar tema
+        initTheme();
         
         // Carregar dados iniciais
         loadStats();

@@ -105,6 +105,19 @@ def file_manager():
         """, status_code=404)
 
 
+@app.get("/templates/file_manager.css")
+def serve_file_manager_css():
+    """
+    Serve the CSS file for the file manager.
+    """
+    css_path = os.path.join(os.path.dirname(__file__), "templates", "file_manager.css")
+    try:
+        with open(css_path, "r", encoding="utf-8") as f:
+            return Response(content=f.read(), media_type="text/css")
+    except FileNotFoundError:
+        return Response(content="/* CSS file not found */", media_type="text/css", status_code=404)
+
+
 api_router = APIRouter()
 v1_api_router = APIRouter()
 v1_media_api_router = APIRouter()

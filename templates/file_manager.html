@@ -480,8 +480,15 @@
             formData.append('file', item.file);
             formData.append('media_type', item.mediaType);
             
-            // Always use main storage endpoint
-            const url = `${API_BASE}/storage`;
+            // Extract filename without extension for the name parameter
+            const originalName = item.file.name;
+            const nameWithoutExtension = originalName.substring(0, originalName.lastIndexOf('.')) || originalName;
+            formData.append('name', nameWithoutExtension);
+            
+            // Use folder-specific endpoint if we're in a folder
+            const url = currentFolder ? 
+                `${API_BASE}/storage/${encodeURIComponent(currentFolder)}` : 
+                `${API_BASE}/storage`;
             
             const response = await fetch(url, {
                 method: 'POST',
@@ -496,6 +503,120 @@
             const result = await response.json();
             return result;
         }
+        
+        // ==================== DRAG AND DROP FUNCTIONS ====================
+        
+        function setupDragAndDrop() {
+            const content = document.getElementById('content');
+            
+            // Prevent default drag behaviors on the entire document
+            document.addEventListener('dragenter', preventDefaults, false);
+            document.addEventListener('dragover', preventDefaults, false);
+            document.addEventListener('dragleave', preventDefaults, false);
+            document.addEventListener('drop', preventDefaults, false);
+            
+            // Add drop zone styles and handlers to content area
+            content.addEventListener('dragenter', handleDragEnter, false);
+            content.addEventListener('dragover', handleDragOver, false);
+            content.addEventListener('dragleave', handleDragLeave, false);
+            content.addEventListener('drop', handleDrop, false);
+        }
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        function handleDragEnter(e) {
+            preventDefaults(e);
+            const content = document.getElementById('content');
+            content.classList.add('drag-over');
+            
+            // Show drop message
+            if (!document.getElementById('dropMessage')) {
+                const dropMessage = document.createElement('div');
+                dropMessage.id = 'dropMessage';
+                dropMessage.className = 'drop-message';
+                dropMessage.innerHTML = `
+                    <div class="drop-message-content">
+                        <div class="drop-icon">📤</div>
+                        <div class="drop-text">Drop files here to upload${currentFolder ? ` to "${currentFolder}"` : ''}</div>
+                    </div>
+                `;
+                content.appendChild(dropMessage);
+            }
+        }
+        
+        function handleDragOver(e) {
+            preventDefaults(e);
+            e.dataTransfer.dropEffect = 'copy';
+        }
+        
+        function handleDragLeave(e) {
+            preventDefaults(e);
+            
+            // Only remove drag-over if we're leaving the content area completely
+            const content = document.getElementById('content');
+            const rect = content.getBoundingClientRect();
+            
+            if (e.clientX < rect.left || e.clientX >= rect.right || 
+                e.clientY < rect.top || e.clientY >= rect.bottom) {
+                content.classList.remove('drag-over');
+                
+                const dropMessage = document.getElementById('dropMessage');
+                if (dropMessage) {
+                    dropMessage.remove();
+                }
+            }
+        }
+        
+        function handleDrop(e) {
+            preventDefaults(e);
+            
+            const content = document.getElementById('content');
+            content.classList.remove('drag-over');
+            
+            const dropMessage = document.getElementById('dropMessage');
+            if (dropMessage) {
+                dropMessage.remove();
+            }
+            
+            const files = Array.from(e.dataTransfer.files);
+            
+            if (files.length === 0) {
+                showNotification('❌ No files to upload', 'error');
+                return;
+            }
+            
+            // Filter only valid media files
+            const validFiles = files.filter(file => {
+                const mediaType = detectMediaType(file.name);
+                return ['image', 'video', 'audio'].includes(mediaType);
+            });
+            
+            if (validFiles.length === 0) {
+                showNotification('❌ No valid media files to upload (images, videos, audio only)', 'error');
+                return;
+            }
+            
+            if (validFiles.length !== files.length) {
+                showNotification(`⚠️  Only ${validFiles.length} of ${files.length} files are valid media files`, 'warning');
+            }
+            
+            // Process the files as if they were selected via file input
+            const fakeEvent = {
+                target: {
+                    files: validFiles,
+                    value: ''
+                }
+            };
+            
+            handleFileUpload(fakeEvent);
+            
+            showNotification(`📤 Starting upload of ${validFiles.length} file(s)${currentFolder ? ` to "${currentFolder}"` : ''}!`);
+        }
+        
+        // ==================== END DRAG AND DROP FUNCTIONS ====================
         
         // ==================== COMBINED VIEW FUNCTIONS ====================
         
@@ -814,6 +935,9 @@
         
         // Inicializar tema
         initTheme();
+        
+        // Configurar drag and drop
+        setupDragAndDrop();
         
         // Carregar dados iniciais
         loadStats();

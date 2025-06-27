@@ -685,6 +685,79 @@ select {
     }
 }
 
+/* ==================== DRAG AND DROP ==================== */
+#content.drag-over {
+    position: relative;
+    border: 3px dashed var(--accent-primary);
+    border-radius: 12px;
+    background: rgba(79, 70, 229, 0.05);
+    transition: all 0.3s ease;
+}
+
+[data-theme="dark"] #content.drag-over {
+    background: rgba(99, 102, 241, 0.1);
+}
+
+.drop-message {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(79, 70, 229, 0.1);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    border-radius: 12px;
+    pointer-events: none;
+}
+
+[data-theme="dark"] .drop-message {
+    background: rgba(99, 102, 241, 0.2);
+}
+
+.drop-message-content {
+    text-align: center;
+    color: var(--accent-primary);
+    font-weight: 600;
+    padding: 40px;
+    border-radius: 12px;
+    background: var(--bg-secondary);
+    box-shadow: 0 10px 30px var(--shadow-heavy);
+    border: 2px solid var(--accent-primary);
+}
+
+.drop-icon {
+    font-size: 4rem;
+    margin-bottom: 20px;
+    animation: bounce 1s infinite;
+}
+
+.drop-text {
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+}
+
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% {
+        transform: translateY(0);
+    }
+    40% {
+        transform: translateY(-10px);
+    }
+    60% {
+        transform: translateY(-5px);
+    }
+}
+
+/* ==================== NOTIFICATION TYPES ==================== */
+.notification.warning {
+    background: var(--warning);
+    color: white;
+}
+
 /* ==================== TRANSITIONS ==================== */
 * {
     transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;

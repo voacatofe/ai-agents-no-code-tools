@@ -349,15 +349,25 @@ class Storage:
     def get_media_type(self, media_id: str) -> str:
         """
         Gets the media type of the given media ID.
+        Works with files in folders and default media directories.
 
         Args:
-            media_id (str): Media ID to get the type for.
+            media_id (str): Media ID to get the type for (UUID or media_type_filename).
 
         Returns:
-            MediaType: The type of the media.
+            str: The type of the media.
         """
-        media_type, _ = self._validate_media_id(media_id)
-        return media_type
+        try:
+            # Use the new universal file finder
+            file_path, file_info = self._find_file_by_uuid_anywhere(media_id)
+            return file_info["media_type"]
+        except FileNotFoundError:
+            # Fallback to old method for compatibility
+            try:
+                media_type, _ = self._validate_media_id(media_id)
+                return media_type
+            except Exception:
+                raise ValueError(f"Media with ID {media_id} not found or invalid format")
 
     def is_valid_url(self, url: str) -> bool:
         """

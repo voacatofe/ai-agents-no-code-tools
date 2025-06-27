@@ -454,9 +454,21 @@ class Storage:
         """
         Cria pastas padrão no sistema.
         """
+        # Garantir que o diretório folders existe
+        folders_path = os.path.join(self.storage_path, "folders")
+        os.makedirs(folders_path, exist_ok=True)
+        
         default_folders = ["temp", "Background Music"]
         for folder_name in default_folders:
-            self.create_folder(folder_name)
+            try:
+                self.create_folder(folder_name)
+                print(f"✅ Pasta '{folder_name}' criada com sucesso")
+            except Exception as e:
+                print(f"⚠️  Erro ao criar pasta '{folder_name}': {e}")
+                # Tentar criar diretamente se create_folder falhar
+                folder_path = os.path.join(folders_path, folder_name)
+                os.makedirs(folder_path, exist_ok=True)
+                print(f"✅ Pasta '{folder_name}' criada diretamente")
     
     def create_folder(self, folder_name: str, parent_folder: str = "") -> bool:
         """
@@ -539,8 +551,11 @@ class Storage:
         Returns:
             bool: True se deletada com sucesso
         """
-        if not folder_path or folder_path == "temp":
-            raise ValueError("Cannot delete temp folder or empty path")
+        # Lista de pastas protegidas que não podem ser deletadas
+        protected_folders = ["temp", "Background Music"]
+        
+        if not folder_path or folder_path in protected_folders:
+            raise ValueError(f"Cannot delete protected folder '{folder_path}' or empty path")
         
         full_path = os.path.join(self.storage_path, "folders", folder_path)
         

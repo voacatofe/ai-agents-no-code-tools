@@ -349,6 +349,174 @@ def delete_file(file_id: str):
     return {"status": "success"}
 
 
+# ==================== FOLDER MANAGEMENT ENDPOINTS ====================
+
+@v1_media_api_router.get("/folders")
+def list_folders(parent_folder: Optional[str] = None):
+    """
+    List folders in the system.
+    
+    Args:
+        parent_folder: Parent folder path to list subfolders
+    """
+    try:
+        folders = storage.list_folders(parent_folder or "")
+        return {
+            "folders": folders,
+            "parent_folder": parent_folder or "",
+            "total": len(folders)
+        }
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": f"Error listing folders: {str(e)}"}
+        )
+
+
+@v1_media_api_router.post("/folders")
+def create_folder(
+    folder_name: str = Form(..., description="Name of the folder to create"),
+    parent_folder: Optional[str] = Form("", description="Parent folder path")
+):
+    """
+    Create a new folder.
+    
+    Args:
+        folder_name: Name of the folder to create
+        parent_folder: Parent folder path (optional)
+    """
+    try:
+        created = storage.create_folder(folder_name, parent_folder or "")
+        if created:
+            return {
+                "success": True,
+                "message": f"Folder '{folder_name}' created successfully",
+                "folder_name": folder_name,
+                "parent_folder": parent_folder or ""
+            }
+        else:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"error": f"Folder '{folder_name}' already exists"}
+            )
+    except ValueError as e:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"error": str(e)}
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": f"Error creating folder: {str(e)}"}
+        )
+
+
+@v1_media_api_router.delete("/folders/{folder_path:path}")
+def delete_folder(folder_path: str):
+    """
+    Delete a folder and all its contents.
+    
+    Args:
+        folder_path: Path of the folder to delete
+    """
+    try:
+        deleted = storage.delete_folder(folder_path)
+        if deleted:
+            return {
+                "success": True,
+                "message": f"Folder '{folder_path}' deleted successfully"
+            }
+        else:
+            return JSONResponse(
+                status_code=status.HTTP_404_NOT_FOUND,
+                content={"error": f"Folder '{folder_path}' not found"}
+            )
+    except ValueError as e:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"error": str(e)}
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": f"Error deleting folder: {str(e)}"}
+        )
+
+
+@v1_media_api_router.get("/folders/{folder_path:path}/contents")
+def get_folder_contents(folder_path: str):
+    """
+    Get contents of a specific folder (subfolders and files).
+    
+    Args:
+        folder_path: Path of the folder to explore
+    """
+    try:
+        contents = storage.list_folder_contents(folder_path)
+        return contents
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": f"Error getting folder contents: {str(e)}"}
+        )
+
+
+@v1_media_api_router.get("/folders/root/contents")
+def get_root_folder_contents():
+    """
+    Get contents of the root folder.
+    """
+    try:
+        contents = storage.list_folder_contents("")
+        return contents
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": f"Error getting root folder contents: {str(e)}"}
+        )
+
+
+@v1_media_api_router.post("/folders/{folder_path:path}/upload")
+def upload_file_to_folder(
+    folder_path: str,
+    file: UploadFile = File(..., description="File to upload"),
+    media_type: Literal["image", "video", "audio"] = Form(..., description="Type of media being uploaded")
+):
+    """
+    Upload a file to a specific folder.
+    
+    Args:
+        folder_path: Path of the folder to upload to
+        file: File to upload
+        media_type: Type of media being uploaded
+    """
+    try:
+        if media_type not in ["image", "video", "audio"]:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"error": f"Invalid media type: {media_type}"}
+            )
+        
+        file_id = storage.upload_media_to_folder(
+            media_type=media_type,
+            media_data=file.file.read(),
+            file_extension=os.path.splitext(file.filename)[1],
+            folder_path=folder_path
+        )
+        
+        return {
+            "file_id": file_id,
+            "filename": file.filename,
+            "folder_path": folder_path,
+            "media_type": media_type
+        }
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": f"Error uploading file to folder: {str(e)}"}
+        )
+
+
 @v1_media_api_router.post("/video-tools/merge")
 def merge_videos(
     background_tasks: BackgroundTasks,

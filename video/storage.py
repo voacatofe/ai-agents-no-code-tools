@@ -24,6 +24,9 @@ class Storage:
             MediaType.TMP,
         ]:
             os.makedirs(os.path.join(self.storage_path, media_type), exist_ok=True)
+        
+        # Create default folders
+        self._create_default_folders()
 
     def _validate_media_id(self, media_id: str) -> tuple[str, str]:
         """
@@ -399,3 +402,251 @@ class Storage:
             
         stats["total_size_mb"] = round(stats["total_size_bytes"] / (1024 * 1024), 2)
         return stats
+    
+    def _create_default_folders(self):
+        """
+        Cria pastas padrão no sistema.
+        """
+        default_folders = ["temp"]
+        for folder_name in default_folders:
+            self.create_folder(folder_name)
+    
+    def create_folder(self, folder_name: str, parent_folder: str = "") -> bool:
+        """
+        Cria uma nova pasta no sistema.
+        
+        Args:
+            folder_name (str): Nome da pasta a ser criada
+            parent_folder (str): Pasta pai (caminho relativo)
+            
+        Returns:
+            bool: True se criada com sucesso, False se já existe
+        """
+        # Validar nome da pasta
+        if not folder_name or ".." in folder_name or "/" in folder_name or "\\" in folder_name:
+            raise ValueError("Invalid folder name")
+        
+        # Construir caminho da pasta
+        if parent_folder:
+            folder_path = os.path.join(self.storage_path, "folders", parent_folder, folder_name)
+        else:
+            folder_path = os.path.join(self.storage_path, "folders", folder_name)
+        
+        # Verificar se já existe
+        if os.path.exists(folder_path):
+            return False
+            
+        # Criar pasta
+        os.makedirs(folder_path, exist_ok=True)
+        return True
+    
+    def list_folders(self, parent_folder: str = "") -> list:
+        """
+        Lista pastas no sistema.
+        
+        Args:
+            parent_folder (str): Pasta pai para listar subpastas
+            
+        Returns:
+            list: Lista de pastas com informações
+        """
+        folders = []
+        
+        if parent_folder:
+            base_path = os.path.join(self.storage_path, "folders", parent_folder)
+        else:
+            base_path = os.path.join(self.storage_path, "folders")
+        
+        if not os.path.exists(base_path):
+            return folders
+        
+        for item in os.listdir(base_path):
+            item_path = os.path.join(base_path, item)
+            if os.path.isdir(item_path):
+                try:
+                    stat = os.stat(item_path)
+                    # Contar arquivos na pasta
+                    file_count = self._count_files_in_folder(os.path.join(parent_folder, item) if parent_folder else item)
+                    
+                    folders.append({
+                        "name": item,
+                        "path": os.path.join(parent_folder, item) if parent_folder else item,
+                        "created_at": stat.st_ctime,
+                        "modified_at": stat.st_mtime,
+                        "file_count": file_count
+                    })
+                except Exception as e:
+                    print(f"Erro ao processar pasta {item}: {e}")
+        
+        # Ordena por nome
+        folders.sort(key=lambda x: x["name"])
+        return folders
+    
+    def delete_folder(self, folder_path: str) -> bool:
+        """
+        Deleta uma pasta e todo seu conteúdo.
+        
+        Args:
+            folder_path (str): Caminho da pasta a ser deletada
+            
+        Returns:
+            bool: True se deletada com sucesso
+        """
+        if not folder_path or folder_path == "temp":
+            raise ValueError("Cannot delete temp folder or empty path")
+        
+        full_path = os.path.join(self.storage_path, "folders", folder_path)
+        
+        if not os.path.exists(full_path):
+            return False
+        
+        import shutil
+        shutil.rmtree(full_path)
+        return True
+    
+    def _count_files_in_folder(self, folder_path: str) -> int:
+        """
+        Conta arquivos em uma pasta específica.
+        """
+        full_path = os.path.join(self.storage_path, "folders", folder_path)
+        if not os.path.exists(full_path):
+            return 0
+        
+        count = 0
+        for root, dirs, files in os.walk(full_path):
+            count += len(files)
+        return count
+    
+    def upload_media_to_folder(self, media_type: str, media_data: bytes, 
+                              file_extension: str = "", folder_path: str = "") -> str:
+        """
+        Faz upload de mídia para uma pasta específica.
+        
+        Args:
+            media_type (str): Tipo de mídia
+            media_data (bytes): Dados binários do arquivo
+            file_extension (str): Extensão do arquivo
+            folder_path (str): Caminho da pasta de destino
+            
+        Returns:
+            str: Media ID do arquivo criado
+        """
+        # Validar tipo de mídia
+        valid_types = [MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO, MediaType.TMP]
+        if media_type not in valid_types:
+            raise ValueError(f"Invalid media type: {media_type}")
+        
+        # Validar extensão
+        if file_extension and (
+            ".." in file_extension or "/" in file_extension or "\\" in file_extension
+        ):
+            raise ValueError("File extension contains invalid characters")
+        
+        # Criar ID e nome do arquivo
+        asset_id = str(uuid.uuid4())
+        filename = f"{asset_id}{file_extension}" if file_extension else asset_id
+        
+        # Determinar caminho do arquivo
+        if folder_path:
+            # Criar pasta se não existe
+            folder_full_path = os.path.join(self.storage_path, "folders", folder_path)
+            os.makedirs(folder_full_path, exist_ok=True)
+            file_path = os.path.join(folder_full_path, filename)
+            media_id = f"folder_{folder_path.replace('/', '_')}_{media_type}_{filename}"
+        else:
+            file_path = os.path.join(self.storage_path, media_type, filename)
+            media_id = f"{media_type}_{filename}"
+        
+        # Verificação de segurança
+        resolved_path = os.path.abspath(file_path)
+        storage_abs_path = os.path.abspath(self.storage_path)
+        if not resolved_path.startswith(storage_abs_path):
+            raise ValueError("Path traversal attempt detected")
+        
+        # Escrever arquivo
+        with open(file_path, "wb") as f:
+            f.write(media_data)
+        
+        return media_id
+    
+    def get_media_from_folder(self, media_id: str) -> bytes:
+        """
+        Recupera mídia de pasta.
+        """
+        file_path = self._get_folder_file_path(media_id)
+        
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Media file {media_id} not found.")
+        
+        with open(file_path, "rb") as f:
+            return f.read()
+    
+    def _get_folder_file_path(self, media_id: str) -> str:
+        """
+        Obtém caminho do arquivo em pasta.
+        """
+        if media_id.startswith("folder_"):
+            # Formato: folder_{folder_path}_{media_type}_{filename}
+            parts = media_id.split("_", 3)
+            if len(parts) >= 4:
+                folder_path = parts[1].replace("_", "/")
+                media_type = parts[2]
+                filename = parts[3]
+                return os.path.join(self.storage_path, "folders", folder_path, filename)
+        
+        # Fallback para arquivos normais
+        return self._get_safe_file_path(media_id)
+    
+    def list_folder_contents(self, folder_path: str = "") -> dict:
+        """
+        Lista conteúdo de uma pasta (subpastas e arquivos).
+        
+        Args:
+            folder_path (str): Caminho da pasta
+            
+        Returns:
+            dict: Dicionário com folders e files
+        """
+        if folder_path:
+            full_path = os.path.join(self.storage_path, "folders", folder_path)
+        else:
+            full_path = os.path.join(self.storage_path, "folders")
+        
+        result = {
+            "folders": [],
+            "files": [],
+            "current_path": folder_path
+        }
+        
+        if not os.path.exists(full_path):
+            return result
+        
+        # Listar subpastas
+        for item in os.listdir(full_path):
+            item_path = os.path.join(full_path, item)
+            if os.path.isdir(item_path):
+                stat = os.stat(item_path)
+                result["folders"].append({
+                    "name": item,
+                    "path": os.path.join(folder_path, item) if folder_path else item,
+                    "created_at": stat.st_ctime,
+                    "file_count": self._count_files_in_folder(os.path.join(folder_path, item) if folder_path else item)
+                })
+            elif os.path.isfile(item_path):
+                # Listar arquivos
+                stat = os.stat(item_path)
+                result["files"].append({
+                    "name": item,
+                    "path": os.path.join(folder_path, item) if folder_path else item,
+                    "size_bytes": stat.st_size,
+                    "size_mb": round(stat.st_size / (1024 * 1024), 2),
+                    "created_at": stat.st_ctime,
+                    "modified_at": stat.st_mtime,
+                    "file_extension": os.path.splitext(item)[1].lower()
+                })
+        
+        # Ordenar
+        result["folders"].sort(key=lambda x: x["name"])
+        result["files"].sort(key=lambda x: x["name"])
+        
+        return result

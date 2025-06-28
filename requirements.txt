@@ -7,3 +7,5 @@ loguru
 chatterbox-tts >= 0.1.2
 faster_whisper
 torchaudio
+psutil
+requests

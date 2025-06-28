@@ -5,6 +5,8 @@ from typing import Literal, Optional
 import os
 import signal
 import sys
+import asyncio
+from asyncio import Semaphore
 from loguru import logger
 from video.tts import TTS
 from video.stt import STT
@@ -15,6 +17,16 @@ from video.builder import VideoBuilder
 from video.config import device
 
 CHUNK_SIZE = 1024 * 1024 * 10  # 10MB chunks
+
+# OTIMIZAÇÃO: Sistema de controle de concorrência
+MAX_CONCURRENT_TTS = int(os.environ.get("MAX_CONCURRENT_TTS", "2"))  # Máximo 2 TTS simultâneos
+MAX_CONCURRENT_VIDEO = int(os.environ.get("MAX_CONCURRENT_VIDEO", "1"))  # Máximo 1 vídeo simultâneo
+MAX_CONCURRENT_HEAVY_TASKS = int(os.environ.get("MAX_CONCURRENT_HEAVY_TASKS", "3"))  # Total de tarefas pesadas
+
+# Semáforos para controlar concorrência
+tts_semaphore = Semaphore(MAX_CONCURRENT_TTS)
+video_semaphore = Semaphore(MAX_CONCURRENT_VIDEO)
+heavy_tasks_semaphore = Semaphore(MAX_CONCURRENT_HEAVY_TASKS)
 
 logger.remove()
 logger.add(
@@ -27,6 +39,8 @@ logger.add(
 logger.info("This server was created by the 'AI Agents A-Z' YouTube channel")
 logger.info("https://www.youtube.com/@aiagentsaz")
 logger.info("Using device: {}", device)
+logger.info("CPU Optimization: Max TTS: {}, Max Video: {}, Max Heavy Tasks: {}", 
+           MAX_CONCURRENT_TTS, MAX_CONCURRENT_VIDEO, MAX_CONCURRENT_HEAVY_TASKS)
 
 def iterfile(path: str):
     with open(path, mode="rb") as file:
@@ -117,7 +131,7 @@ def get_kokoro_voices(lang_code: Optional[str] = None):
 
 
 @v1_media_api_router.post("/audio-tools/tts/kokoro", tags=["TTS - Text to Speech"])
-def generate_kokoro_tts(
+async def generate_kokoro_tts(
     background_tasks: BackgroundTasks,
     text: str = Form(..., description="Text to convert to speech"),
     voice: Optional[str] = Form(None, description="Voice name for kokoro TTS"),
@@ -127,6 +141,13 @@ def generate_kokoro_tts(
     """
     Generate audio from text using specified TTS engine.
     """
+    # OTIMIZAÇÃO: Verificar se há capacidade para processar
+    if tts_semaphore.locked() or heavy_tasks_semaphore.locked():
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={"error": "Server busy processing other TTS requests. Please try again later."},
+        )
+    
     if not voice:
         voice = "af_heart"
     tts_manager = TTS()
@@ -141,14 +162,27 @@ def generate_kokoro_tts(
     )
     tmp_file_id = storage.create_tmp_file(audio_id)
 
-    def bg_task():
-        tts_manager.kokoro(
-            text=text,
-            output_path=audio_path,
-            voice=voice,
-            speed=int(speed) if speed else 1,
-        )
-        storage.delete_media(tmp_file_id)
+    async def bg_task():
+        async with tts_semaphore:
+            async with heavy_tasks_semaphore:
+                logger.info("Starting Kokoro TTS processing for audio_id: {}", audio_id)
+                try:
+                    # Executar TTS em thread separada para não bloquear
+                    loop = asyncio.get_event_loop()
+                    await loop.run_in_executor(
+                        None,
+                        lambda: tts_manager.kokoro(
+                            text=text,
+                            output_path=audio_path,
+                            voice=voice,
+                            speed=int(speed) if speed else 1,
+                        )
+                    )
+                    logger.info("Completed Kokoro TTS processing for audio_id: {}", audio_id)
+                except Exception as e:
+                    logger.error("Error in Kokoro TTS processing: {}", e)
+                finally:
+                    storage.delete_media(tmp_file_id)
 
     background_tasks.add_task(bg_task)
 
@@ -156,7 +190,7 @@ def generate_kokoro_tts(
 
 
 @v1_media_api_router.post("/audio-tools/tts/chatterbox", tags=["TTS - Text to Speech"])
-def generate_chatterbox_tts(
+async def generate_chatterbox_tts(
     background_tasks: BackgroundTasks,
     text: str = Form(..., description="Text to convert to speech"),
     sample_audio_id: Optional[str] = Form(
@@ -176,6 +210,13 @@ def generate_chatterbox_tts(
     """
     Generate audio from text using Chatterbox TTS.
     """
+    # OTIMIZAÇÃO: Verificar se há capacidade para processar
+    if tts_semaphore.locked() or heavy_tasks_semaphore.locked():
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={"error": "Server busy processing other TTS requests. Please try again later."},
+        )
+    
     tts_manager = TTS()
     
     # Create file in temp folder (intermediate file)
@@ -210,21 +251,30 @@ def generate_chatterbox_tts(
 
     tmp_file_id = storage.create_tmp_file(audio_id)
 
-    def bg_task():
-        try:
-            if sample_audio_path:
-                tts_manager.chatterbox(
-                    text=text,
-                    output_path=audio_path,
-                    sample_audio_path=sample_audio_path,
-                    exaggeration=exaggeration or 0.5,
-                    cfg_weight=cfg_weight or 0.5,
-                    temperature=temperature or 0.8,
-                )
-        except Exception as e:
-            logger.error(f"Error in Chatterbox TTS: {e}")
-        finally:
-            storage.delete_media(tmp_file_id)
+    async def bg_task():
+        async with tts_semaphore:
+            async with heavy_tasks_semaphore:
+                logger.info("Starting Chatterbox TTS processing for audio_id: {}", audio_id)
+                try:
+                    if sample_audio_path:
+                        # Executar TTS em thread separada para não bloquear
+                        loop = asyncio.get_event_loop()
+                        await loop.run_in_executor(
+                            None,
+                            lambda: tts_manager.chatterbox(
+                                text=text,
+                                output_path=audio_path,
+                                sample_audio_path=sample_audio_path,
+                                exaggeration=exaggeration or 0.5,
+                                cfg_weight=cfg_weight or 0.5,
+                                temperature=temperature or 0.8,
+                            )
+                        )
+                    logger.info("Completed Chatterbox TTS processing for audio_id: {}", audio_id)
+                except Exception as e:
+                    logger.error("Error in Chatterbox TTS processing: {}", e)
+                finally:
+                    storage.delete_media(tmp_file_id)
 
     background_tasks.add_task(bg_task)
 
@@ -607,7 +657,7 @@ def get_folder_contents(folder_path: str):
 
 
 @v1_media_api_router.post("/video-tools/merge", tags=["Video Tools"])
-def merge_videos(
+async def merge_videos(
     background_tasks: BackgroundTasks,
     video_ids: str = Form(..., description="List of video IDs to merge"),
     background_music_id: Optional[str] = Form(
@@ -621,6 +671,13 @@ def merge_videos(
     """
     Merge multiple videos into one.
     """
+    # OTIMIZAÇÃO: Verificar se há capacidade para processar vídeo
+    if video_semaphore.locked() or heavy_tasks_semaphore.locked():
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={"error": "Server busy processing other video tasks. Please try again later."},
+        )
+    
     video_id_list = video_ids.split(",") if video_ids else []
     if not video_id_list:
         return JSONResponse(
@@ -656,14 +713,27 @@ def merge_videos(
 
     temp_file_id = storage.create_tmp_file(merged_video_id)
 
-    def bg_task():
-        utils.merge_videos(
-            video_paths=video_paths,
-            output_path=merged_video_path,
-            background_music_path=background_music_path or "",
-            background_music_volume=background_music_volume or 0.5,
-        )
-        storage.delete_media(temp_file_id)
+    async def bg_task():
+        async with video_semaphore:
+            async with heavy_tasks_semaphore:
+                logger.info("Starting video merge processing for video_id: {}", merged_video_id)
+                try:
+                    # Executar merge em thread separada para não bloquear
+                    loop = asyncio.get_event_loop()
+                    await loop.run_in_executor(
+                        None,
+                        lambda: utils.merge_videos(
+                            video_paths=video_paths,
+                            output_path=merged_video_path,
+                            background_music_path=background_music_path or "",
+                            background_music_volume=background_music_volume or 0.5,
+                        )
+                    )
+                    logger.info("Completed video merge processing for video_id: {}", merged_video_id)
+                except Exception as e:
+                    logger.error("Error in video merge processing: {}", e)
+                finally:
+                    storage.delete_media(temp_file_id)
 
     background_tasks.add_task(bg_task)
 
@@ -671,7 +741,7 @@ def merge_videos(
 
 
 @v1_media_api_router.post("/video-tools/generate/tts-captioned-video", tags=["Video Tools"])
-def generate_captioned_video(
+async def generate_captioned_video(
     background_tasks: BackgroundTasks,
     background_id: str = Form(..., description="Background image ID"),
     text: Optional[str] = Form(None, description="Text to generate video from"),
@@ -694,6 +764,13 @@ def generate_captioned_video(
     Generate a captioned video from text and background image.
 
     """
+    # OTIMIZAÇÃO: Verificar se há capacidade para processar vídeo + TTS
+    if video_semaphore.locked() or tts_semaphore.locked() or heavy_tasks_semaphore.locked():
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={"error": "Server busy processing other heavy tasks. Please try again later."},
+        )
+    
     if audio_id and not storage.media_exists(audio_id):
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -734,10 +811,14 @@ def generate_captioned_video(
 
     tmp_file_id = storage.create_tmp_file(output_id)
 
-    def bg_task(
+    async def bg_task(
         tmp_file_id: str = tmp_file_id,
     ):
-        tmp_file_ids = [tmp_file_id]
+        async with video_semaphore:
+            async with heavy_tasks_semaphore:
+                logger.info("Starting captioned video generation for video_id: {}", output_id)
+                try:
+                    tmp_file_ids = [tmp_file_id]
         
         # Setup temp folder path for intermediate files
         import uuid
@@ -844,9 +925,17 @@ def generate_captioned_video(
                 "file_extension": ".mp4"
             })
 
-        for tmp_file_id in tmp_file_ids:
-            if storage.media_exists(tmp_file_id):
-                storage.delete_media(tmp_file_id)
+                    for tmp_file_id in tmp_file_ids:
+                        if storage.media_exists(tmp_file_id):
+                            storage.delete_media(tmp_file_id)
+                    
+                    logger.info("Completed captioned video generation for video_id: {}", output_id)
+                except Exception as e:
+                    logger.error("Error in captioned video generation: {}", e)
+                    # Cleanup temporary files in case of error
+                    for tmp_file_id in tmp_file_ids:
+                        if storage.media_exists(tmp_file_id):
+                            storage.delete_media(tmp_file_id)
 
     background_tasks.add_task(bg_task, tmp_file_id=tmp_file_id)
 

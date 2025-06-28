@@ -21,4 +21,16 @@ COPY templates /app/templates
 
 ENV PYTHONUNBUFFERED=1
 
+# Configurações de otimização de CPU para containers
+ENV MAX_CPU_THREADS=2
+ENV CPU_USAGE_LIMIT=0.5
+ENV MAX_CONCURRENT_TTS=1
+ENV MAX_CONCURRENT_VIDEO=1
+ENV MAX_CONCURRENT_HEAVY_TASKS=2
+
+# Configurações adicionais do PyTorch para otimização
+ENV OMP_NUM_THREADS=2
+ENV MKL_NUM_THREADS=2
+ENV TORCH_NUM_THREADS=2
+
 CMD ["fastapi", "run", "server.py", "--host", "0.0.0.0", "--port", "8000"]

@@ -8,6 +8,30 @@ Video editing tools to use with no-code tools like n8n, Zapier, and Make. Brough
 
 ### Be part of a growing community and help us create more content like this
 
+# ⚡ CPU Optimization for VPS
+
+**NEW:** This project now includes CPU optimization features to prevent VPS crashes during heavy processing.
+
+For optimal performance on your VPS, configure the following environment variables:
+
+```bash
+# For small VPS (1-2 cores, 2-4GB RAM)
+export MAX_CPU_THREADS=2
+export CPU_USAGE_LIMIT=0.5
+export MAX_CONCURRENT_TTS=1
+export MAX_CONCURRENT_VIDEO=1
+export MAX_CONCURRENT_HEAVY_TASKS=2
+
+# For medium VPS (2-4 cores, 4-8GB RAM) - RECOMMENDED
+export MAX_CPU_THREADS=4
+export CPU_USAGE_LIMIT=0.7
+export MAX_CONCURRENT_TTS=2
+export MAX_CONCURRENT_VIDEO=1
+export MAX_CONCURRENT_HEAVY_TASKS=3
+```
+
+📖 **See [OPTIMIZATION_GUIDE.md](OPTIMIZATION_GUIDE.md) for complete optimization details.**
+
 # Starting the project
 
 ## Using Docker
@@ -46,6 +70,24 @@ docker run --rm --gpus=all -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABI
    ```bash
    fastapi dev server.py --host 0.0.0.0
    ```
+
+## Monitoring Resources
+
+Use the included monitoring script to track CPU/memory usage and server load:
+
+```bash
+# Install monitoring dependencies
+pip install psutil requests
+
+# Run the monitor
+python monitor.py
+```
+
+This will show real-time information about:
+- 🖥️ Server status (online/offline)
+- ⚡ Server load (busy/available)
+- 📊 CPU and memory usage
+- ⚙️ Current optimization settings
 
 # Documentation
 

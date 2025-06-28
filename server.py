@@ -743,7 +743,7 @@ async def merge_videos(
 @v1_media_api_router.post("/video-tools/generate/tts-captioned-video", tags=["Video Tools"])
 async def generate_captioned_video(
     background_tasks: BackgroundTasks,
-    background_id: str = Form(..., description="Background image ID"),
+    background_id: str = Form(..., description="Background image or video ID"),
     text: Optional[str] = Form(None, description="Text to generate video from"),
     width: Optional[int] = Form(1080, description="Width of the video (default: 1080)"),
     height: Optional[int] = Form(
@@ -761,8 +761,10 @@ async def generate_captioned_video(
     name: Optional[str] = Form(None, description="Custom name for the video (optional)")
 ):
     """
-    Generate a captioned video from text and background image.
-
+    Generate a captioned video from text and background image or video.
+    
+    For background images: Applies Ken Burns effect (subtle zoom)
+    For background videos: No zoom effect, just scales to fit dimensions
     """
     # OTIMIZAÇÃO: Verificar se há capacidade para processar vídeo + TTS
     if video_semaphore.locked() or tts_semaphore.locked() or heavy_tasks_semaphore.locked():
@@ -783,10 +785,10 @@ async def generate_captioned_video(
             content={"error": f"Invalid voice: {kokoro_voice}."},
         )
     media_type = storage.get_media_type(background_id)
-    if media_type not in ["image"]:
+    if media_type not in ["image", "video"]:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            content={"error": f"Invalid media type: {media_type}"},
+            content={"error": f"Invalid media type: {media_type}. Must be 'image' or 'video'"},
         )
     if not storage.media_exists(background_id):
         return JSONResponse(
@@ -907,9 +909,12 @@ async def generate_captioned_video(
                         file_path=subtitle_path,
                     )
 
-                    builder.set_background_image(
-                        storage.get_media_path(background_id),
-                    )
+                    # Set background based on media type
+                    background_path = storage.get_media_path(background_id)
+                    if media_type == "image":
+                        builder.set_background_image(background_path)
+                    elif media_type == "video":
+                        builder.set_background_video(background_path)
 
                     builder.set_output_path(output_path)
 

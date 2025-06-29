@@ -360,8 +360,8 @@ select {
 .notification.success { background: var(--success); }
 .notification.error { background: var(--error); }
 
-/* ==================== BREADCRUMB ==================== */
-.breadcrumb {
+/* ==================== NAVIGATION CONTROLS ==================== */
+.navigation-controls {
     background: var(--bg-secondary);
     padding: 15px 20px;
     border-radius: 12px;
@@ -369,27 +369,69 @@ select {
     margin-bottom: 20px;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 15px;
     transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.btn-back {
+    background: var(--text-secondary);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    font-size: 0.9em;
+    white-space: nowrap;
+}
+
+.btn-back:hover {
+    background: var(--text-primary);
+    transform: translateX(-2px);
+}
+
+.btn-back:active {
+    transform: translateX(-1px);
+}
+
+/* ==================== BREADCRUMB ==================== */
+.breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0; /* Allow shrinking */
 }
 
 .breadcrumb-item {
     color: var(--text-secondary);
     cursor: pointer;
-    transition: color 0.2s;
+    transition: all 0.2s ease;
+    padding: 4px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+    position: relative;
 }
 
 .breadcrumb-item:hover {
     color: var(--accent-primary);
+    background: rgba(79, 70, 229, 0.1);
 }
 
 .breadcrumb-item.active {
     color: var(--accent-primary);
     font-weight: 600;
+    background: rgba(79, 70, 229, 0.15);
 }
 
 .breadcrumb-separator {
     color: var(--border-light);
+    font-weight: 300;
+    user-select: none;
 }
 
 /* ==================== FOLDERS ==================== */

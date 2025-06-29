@@ -210,6 +210,158 @@ class Storage:
         media_id = f"{media_type}_{filename}"
         return media_id
 
+    def upload_media_stream(
+        self, media_type: str, file_stream, file_extension: str = "", custom_name: str = ""
+    ) -> str:
+        """
+        Uploads media to the server using streaming to avoid memory overload.
+
+        Args:
+            media_type (str): Type of media, e.g., 'image' or 'video'.
+            file_stream: File stream object with read() method.
+            file_extension (str): File extension, e.g., '.jpg', '.mp4', '.wav'.
+            custom_name (str): Custom name for the file (optional).
+
+        Returns:
+            str: Media ID, e.g., 'image_12345.jpg' or 'video_67890.mp4'.
+        """
+        # Validate media type
+        valid_types = [MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO, MediaType.TMP]
+        if media_type not in valid_types:
+            raise ValueError(f"Invalid media type: {media_type}")
+
+        # Validate file extension to prevent path traversal
+        if file_extension and (
+            ".." in file_extension or "/" in file_extension or "\\" in file_extension
+        ):
+            raise ValueError("File extension contains invalid characters")
+        
+        # Validate custom name to prevent path traversal
+        if custom_name and (
+            ".." in custom_name or "/" in custom_name or "\\" in custom_name
+        ):
+            raise ValueError("Custom name contains invalid characters")
+
+        # Use custom name if provided, otherwise generate unique UUID
+        if custom_name:
+            # Sanitize custom name for security
+            safe_name = self._sanitize_filename(custom_name)
+            filename = f"{safe_name}{file_extension}" if file_extension else safe_name
+        else:
+            asset_id = str(uuid.uuid4())
+            filename = f"{asset_id}{file_extension}" if file_extension else asset_id
+            
+        file_path = os.path.join(self.storage_path, media_type, filename)
+
+        # Additional safety check
+        resolved_path = os.path.abspath(file_path)
+        storage_abs_path = os.path.abspath(self.storage_path)
+        if not resolved_path.startswith(storage_abs_path):
+            raise ValueError("Path traversal attempt detected")
+
+        # Stream the file to disk without loading entirely into memory
+        with open(file_path, "wb") as f:
+            while True:
+                chunk = file_stream.read(8192)  # Read in 8KB chunks
+                if not chunk:
+                    break
+                f.write(chunk)
+
+        media_id = f"{media_type}_{filename}"
+        return media_id
+
+    def upload_media_stream_to_folder(
+        self, media_type: str, file_stream, file_extension: str = "", 
+        folder_path: str = "", custom_name: str = ""
+    ) -> str:
+        """
+        Upload media to a specific folder using streaming to avoid memory overload.
+        
+        Args:
+            media_type (str): Type of media
+            file_stream: File stream object with read() method
+            file_extension (str): File extension
+            folder_path (str): Target folder path (real name or normalized ID)
+            custom_name (str): Custom name for the file
+            
+        Returns:
+            str: Media ID of the created file
+        """
+        # Validate media type
+        valid_types = [MediaType.IMAGE, MediaType.VIDEO, MediaType.AUDIO, MediaType.TMP]
+        if media_type not in valid_types:
+            raise ValueError(f"Invalid media type: {media_type}")
+        
+        # Convert normalized ID to real name if necessary
+        if folder_path:
+            # If contains '/', it's a path - map each part
+            if '/' in folder_path:
+                path_parts = folder_path.split('/')
+                real_parts = []
+                current_parent = ""
+                
+                for part in path_parts:
+                    real_name = self._get_folder_name_from_id(part, current_parent)
+                    real_parts.append(real_name)
+                    current_parent = '/'.join(real_parts) if real_parts else ""
+                
+                folder_path = '/'.join(real_parts)
+            else:
+                # It's a single folder
+                folder_path = self._get_folder_name_from_id(folder_path)
+        
+        # Validate extension
+        if file_extension and (
+            ".." in file_extension or "/" in file_extension or "\\" in file_extension
+        ):
+            raise ValueError("File extension contains invalid characters")
+        
+        # Validate custom name
+        if custom_name and (
+            ".." in custom_name or "/" in custom_name or "\\" in custom_name
+        ):
+            raise ValueError("Custom name contains invalid characters")
+        
+        # Generate simple media_id - just UUID
+        asset_id = str(uuid.uuid4())
+        safe_filename = f"{asset_id}{file_extension}" if file_extension else asset_id
+        media_id = asset_id  # Clean Media ID, no prefixes
+        
+        # Determine file path
+        if folder_path:
+            # Create folder if it doesn't exist
+            folder_full_path = os.path.join(self.storage_path, "folders", folder_path)
+            os.makedirs(folder_full_path, exist_ok=True)
+            file_path = os.path.join(folder_full_path, safe_filename)
+        else:
+            file_path = os.path.join(self.storage_path, media_type, safe_filename)
+        
+        # Security check
+        resolved_path = os.path.abspath(file_path)
+        storage_abs_path = os.path.abspath(self.storage_path)
+        if not resolved_path.startswith(storage_abs_path):
+            raise ValueError("Path traversal attempt detected")
+        
+        # Stream the file to disk without loading entirely into memory
+        with open(file_path, "wb") as f:
+            while True:
+                chunk = file_stream.read(8192)  # Read in 8KB chunks
+                if not chunk:
+                    break
+                f.write(chunk)
+        
+        # Save file metadata (including custom name)
+        if custom_name:
+            self._save_file_metadata(media_id, {
+                "custom_name": custom_name,
+                "original_filename": custom_name,
+                "media_type": media_type,
+                "folder_path": folder_path,
+                "file_extension": file_extension
+            })
+        
+        return media_id
+
     def get_media(self, media_id: str) -> bytes:
         """
         Retrieves media by ID.

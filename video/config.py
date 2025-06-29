@@ -35,7 +35,7 @@ else:
         logger.info("File /sys/fs/cgroup/cpu.max not found, using os.cpu_count()")
 
     # OTIMIZAÇÃO: Limitar threads baseado no ambiente
-    num_threads = min(MAX_CPU_THREADS, int(num_cores * CPU_USAGE_LIMIT))
+    num_threads = min(MAX_CPU_THREADS, int((num_cores or 1) * CPU_USAGE_LIMIT))
     num_threads = max(1, num_threads)  # Pelo menos 1 thread
     
     logger.info("Optimized CPU configuration: {} cores available, using {} threads (limit: {})", 

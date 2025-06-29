@@ -103,7 +103,7 @@ v1_api_router = APIRouter()
 v1_media_api_router = APIRouter()
 
 storage = Storage(
-    storage_path=os.path.abspath(os.path.join(os.path.dirname(__file__), "media"))
+    storage_path=os.environ.get("STORAGE_PATH", os.path.abspath(os.path.join(os.path.dirname(__file__), "media")))
 )
 
 
@@ -307,17 +307,17 @@ def upload_file(
     
     if file:
         if folder_path:
-            file_id = storage.upload_media_to_folder(
+            file_id = storage.upload_media_stream_to_folder(
                 media_type=media_type,
-                media_data=file.file.read(),
+                file_stream=file.file,
                 file_extension=os.path.splitext(file.filename or "")[1],
                 folder_path=folder_path,
                 custom_name=name or ""
             )
         else:
-            file_id = storage.upload_media(
+            file_id = storage.upload_media_stream(
                 media_type=media_type,
-                media_data=file.file.read(),
+                file_stream=file.file,
                 file_extension=os.path.splitext(file.filename or "")[1],
                 custom_name=name or ""
             )

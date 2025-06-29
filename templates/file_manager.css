@@ -360,8 +360,8 @@ select {
 .notification.success { background: var(--success); }
 .notification.error { background: var(--error); }
 
-/* ==================== NAVIGATION CONTROLS ==================== */
-.navigation-controls {
+/* ==================== BREADCRUMB ==================== */
+.breadcrumb {
     background: var(--bg-secondary);
     padding: 15px 20px;
     border-radius: 12px;
@@ -369,42 +369,8 @@ select {
     margin-bottom: 20px;
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 8px;
     transition: background-color 0.3s ease, box-shadow 0.3s ease;
-}
-
-.btn-back {
-    background: var(--text-secondary);
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    transition: all 0.2s ease;
-    font-size: 0.9em;
-    white-space: nowrap;
-}
-
-.btn-back:hover {
-    background: var(--text-primary);
-    transform: translateX(-2px);
-}
-
-.btn-back:active {
-    transform: translateX(-1px);
-}
-
-/* ==================== BREADCRUMB ==================== */
-.breadcrumb {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex: 1;
-    min-width: 0; /* Allow shrinking */
 }
 
 .breadcrumb-item {

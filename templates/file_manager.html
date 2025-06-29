@@ -22,16 +22,9 @@
             <!-- Statistics will be loaded here -->
         </div>
         
-        <!-- Navigation Controls -->
-        <div class="navigation-controls">
-            <button class="btn btn-back" id="backButton" onclick="navigateBack()" title="Go back to previous folder" style="display: none;">
-                ← Back
-            </button>
-            
-            <!-- Breadcrumb Navigation -->
-            <div id="breadcrumb" class="breadcrumb">
-                <span class="breadcrumb-item active" onclick="navigateToFolder('')">🏠 Home</span>
-            </div>
+        <!-- Breadcrumb Navigation -->
+        <div id="breadcrumb" class="breadcrumb">
+            <span class="breadcrumb-item active" onclick="navigateToFolder('')">🏠 Home</span>
         </div>
         
         <!-- Controls -->
@@ -120,54 +113,35 @@
         
         // Global variables for folder system
         let currentFolder = '';
-        let navigationHistory = []; // Track navigation history for back button
         
         // ==================== NAVIGATION FUNCTIONS ====================
         
-        function navigateBack() {
-            if (navigationHistory.length > 0) {
-                const previousFolder = navigationHistory.pop();
-                currentFolder = previousFolder;
-                updateBreadcrumb(currentFolder);
-                updateBackButton();
-                loadFolderContents(currentFolder);
-                showNotification(`📂 Returned to ${currentFolder || 'Home'}`);
-            }
-        }
-        
-        function updateBackButton() {
-            const backButton = document.getElementById('backButton');
-            if (navigationHistory.length > 0 || currentFolder !== '') {
-                backButton.style.display = 'inline-block';
-                
-                // Update button text based on where we'll go back to
-                if (navigationHistory.length > 0) {
-                    const previousFolder = navigationHistory[navigationHistory.length - 1];
-                    backButton.textContent = `← Back to ${previousFolder || 'Home'}`;
-                } else if (currentFolder !== '') {
-                    backButton.textContent = '← Back to Home';
-                }
-            } else {
-                backButton.style.display = 'none';
-            }
-        }
-        
-        function navigateToFolder(folderPath) {
-            // Add current folder to history before navigating (if it's different)
-            if (currentFolder !== folderPath && currentFolder !== '') {
-                navigationHistory.push(currentFolder);
+        function navigateToFolder(folderPath, updateHistory = true) {
+            currentFolder = folderPath;
+            
+            // Update browser history
+            if (updateHistory) {
+                const url = folderPath ? `?folder=${encodeURIComponent(folderPath)}` : '/';
+                const title = folderPath ? `File Manager - ${folderPath}` : 'File Manager';
+                history.pushState({ folder: folderPath }, title, url);
             }
             
+            updateBreadcrumb(folderPath);
+            loadFolderContents(folderPath);
+        }
+        
+        // Handle browser back/forward buttons
+        window.addEventListener('popstate', function(event) {
+            const folderPath = event.state ? event.state.folder : getInitialFolderFromURL();
             currentFolder = folderPath;
             updateBreadcrumb(folderPath);
-            updateBackButton();
             loadFolderContents(folderPath);
-            
-            if (folderPath) {
-                showNotification(`📂 Opened folder: ${folderPath}`);
-            } else {
-                showNotification('🏠 Returned to Home');
-            }
+        });
+        
+        // Get initial folder from URL parameters
+        function getInitialFolderFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('folder') || '';
         }
         
         function updateBreadcrumb(folderPath) {
@@ -178,13 +152,7 @@
             const homeItem = document.createElement('span');
             homeItem.className = folderPath === '' ? 'breadcrumb-item active' : 'breadcrumb-item';
             homeItem.innerHTML = '🏠 Home';
-            homeItem.onclick = () => {
-                // Clear navigation history when going to home
-                if (currentFolder !== '') {
-                    navigationHistory = [];
-                }
-                navigateToFolder('');
-            };
+            homeItem.onclick = () => navigateToFolder('');
             homeItem.title = 'Go to Home folder';
             breadcrumb.appendChild(homeItem);
             
@@ -210,12 +178,7 @@
                     
                     // Make all breadcrumb items clickable
                     if (index < parts.length - 1) {
-                        item.onclick = () => {
-                            // Trim navigation history to this point
-                            const pathParts = thisPath.split('/');
-                            navigationHistory = navigationHistory.slice(0, pathParts.length - 1);
-                            navigateToFolder(thisPath);
-                        };
+                        item.onclick = () => navigateToFolder(thisPath);
                     }
                     
                     breadcrumb.appendChild(item);
@@ -1026,21 +989,6 @@
             if (event.key === 'Escape') {
                 closeModal();
             }
-            
-            // Alt + Left Arrow = Back navigation (browser-like)
-            if (event.altKey && event.key === 'ArrowLeft') {
-                event.preventDefault();
-                navigateBack();
-            }
-            
-            // Alt + Up Arrow = Go to parent folder
-            if (event.altKey && event.key === 'ArrowUp') {
-                event.preventDefault();
-                if (currentFolder) {
-                    const parentPath = currentFolder.split('/').slice(0, -1).join('/');
-                    navigateToFolder(parentPath);
-                }
-            }
         });
         
         // Initialize theme
@@ -1049,8 +997,20 @@
         // Setup drag and drop
         setupDragAndDrop();
         
+        // Initialize folder from URL and setup initial state
+        const initialFolder = getInitialFolderFromURL();
+        currentFolder = initialFolder;
+        
+        // Set initial browser history state
+        if (initialFolder) {
+            history.replaceState({ folder: initialFolder }, `File Manager - ${initialFolder}`, `?folder=${encodeURIComponent(initialFolder)}`);
+        } else {
+            history.replaceState({ folder: '' }, 'File Manager', '/');
+        }
+        
         // Load initial data
         loadStats();
+        updateBreadcrumb(currentFolder);
         loadCombinedView(); // Start with combined view
     </script>
 </body>

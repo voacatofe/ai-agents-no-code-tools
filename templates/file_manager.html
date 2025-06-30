@@ -40,6 +40,14 @@
             <button class="btn btn-primary" onclick="toggleCreateFolderForm()">📁 New Folder</button>
             <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">📤 Upload Files</button>
             
+            <!-- Multi-selection controls -->
+            <div class="selection-controls" id="selectionControls" style="display: none;">
+                <span id="selectionCount">0 selected</span>
+                <button class="btn btn-secondary" onclick="selectAll()">📋 Select All</button>
+                <button class="btn btn-secondary" onclick="clearSelection()">❌ Clear</button>
+                <button class="btn btn-danger" onclick="deleteSelected()">🗑️ Delete Selected</button>
+            </div>
+            
             <!-- Hidden file input -->
             <input type="file" id="fileInput" style="display: none;" multiple accept="image/*,video/*,audio/*" onchange="handleFileUpload(event)">
         </div>
@@ -112,6 +120,10 @@
         
         // Global variables for folder system
         let currentFolder = '';
+        
+        // Global variables for multi-selection
+        let selectedFiles = new Set();
+        let isMultiSelectMode = false;
         
         // ==================== NAVIGATION FUNCTIONS ====================
         
@@ -299,26 +311,47 @@
                     
                 case 'video':
                     previewContent = `
-                        <video controls class="modal-media" preload="metadata">
-                            <source src="${fileUrl}" type="video/mp4">
-                            Your browser does not support the video tag.
-                        </video>
+                        <div class="modern-video-player">
+                            <video controls class="modal-media" preload="metadata" controlsList="nodownload">
+                                <source src="${fileUrl}" type="video/mp4">
+                                <source src="${fileUrl}" type="video/webm">
+                                <source src="${fileUrl}" type="video/ogg">
+                                Your browser does not support the video tag.
+                            </video>
+                            <div class="video-info">
+                                <div class="video-title">${filename}</div>
+                                <div class="video-controls-custom">
+                                    <button onclick="toggleFullscreen(this.closest('.modern-video-player').querySelector('video'))" class="btn btn-secondary btn-small">🔍 Fullscreen</button>
+                                    <button onclick="togglePictureInPicture(this.closest('.modern-video-player').querySelector('video'))" class="btn btn-secondary btn-small">📺 PiP</button>
+                                </div>
+                            </div>
+                        </div>
                     `;
                     break;
                     
                 case 'audio':
                     previewContent = `
-                        <div class="audio-player">
+                        <div class="modern-audio-player">
+                            <div class="audio-artwork">
+                                <div class="audio-icon">🎵</div>
+                            </div>
                             <div class="audio-info">
                                 <div class="audio-title">${filename}</div>
-                                <div class="audio-details">Click play to listen</div>
+                                <div class="audio-details">High quality audio player</div>
                             </div>
-                            <audio controls preload="metadata">
-                                <source src="${fileUrl}" type="audio/mpeg">
-                                <source src="${fileUrl}" type="audio/wav">
-                                <source src="${fileUrl}" type="audio/ogg">
-                                Your browser does not support the audio tag.
-                            </audio>
+                            <div class="audio-controls">
+                                <audio controls preload="metadata" class="modern-audio">
+                                    <source src="${fileUrl}" type="audio/mpeg">
+                                    <source src="${fileUrl}" type="audio/wav">
+                                    <source src="${fileUrl}" type="audio/ogg">
+                                    <source src="${fileUrl}" type="audio/mp4">
+                                    Your browser does not support the audio tag.
+                                </audio>
+                            </div>
+                            <div class="audio-features">
+                                <button onclick="downloadAudio('${fileUrl}', '${filename}')" class="btn btn-primary btn-small">⬇️ Download</button>
+                                <button onclick="shareAudio('${fileUrl}')" class="btn btn-secondary btn-small">📤 Share</button>
+                            </div>
                         </div>
                     `;
                     break;
@@ -779,7 +812,15 @@
                 
                 if (filesToShow.length > 0) {
                     const filesGrid = filesToShow.map(file => `
-                        <div class="file-card">
+                        <div class="file-card ${selectedFiles.has(file.media_id) ? 'selected' : ''}" data-file-id="${file.media_id}">
+                            <div class="file-checkbox">
+                                <input type="checkbox" 
+                                       id="file-${file.media_id}" 
+                                       ${selectedFiles.has(file.media_id) ? 'checked' : ''}
+                                       onchange="toggleFileSelection('${file.media_id}', this.checked)"
+                                       onclick="event.stopPropagation()">
+                                <label for="file-${file.media_id}"></label>
+                            </div>
                             ${generateFileThumbnail(file)}
                             <div class="file-type type-${file.media_type || 'file'}">${(file.media_type || 'FILE').toUpperCase()}</div>
                             <div class="file-name">${file.filename || file.name}</div>
@@ -1007,6 +1048,153 @@
             history.replaceState({ folder: '' }, 'File Manager', '/');
         }
         
+        // ==================== MULTI-SELECTION FUNCTIONS ====================
+        
+        function toggleFileSelection(fileId, isSelected) {
+            if (isSelected) {
+                selectedFiles.add(fileId);
+            } else {
+                selectedFiles.delete(fileId);
+            }
+            updateSelectionUI();
+        }
+        
+        function updateSelectionUI() {
+            const selectionControls = document.getElementById('selectionControls');
+            const selectionCount = document.getElementById('selectionCount');
+            
+            if (selectedFiles.size > 0) {
+                selectionControls.style.display = 'flex';
+                selectionCount.textContent = `${selectedFiles.size} selected`;
+                isMultiSelectMode = true;
+            } else {
+                selectionControls.style.display = 'none';
+                isMultiSelectMode = false;
+            }
+            
+            // Update visual selection on cards
+            document.querySelectorAll('.file-card').forEach(card => {
+                const fileId = card.dataset.fileId;
+                if (selectedFiles.has(fileId)) {
+                    card.classList.add('selected');
+                } else {
+                    card.classList.remove('selected');
+                }
+            });
+        }
+        
+        function selectAll() {
+            const fileCards = document.querySelectorAll('.file-card[data-file-id]');
+            fileCards.forEach(card => {
+                const fileId = card.dataset.fileId;
+                const checkbox = card.querySelector('input[type="checkbox"]');
+                selectedFiles.add(fileId);
+                if (checkbox) checkbox.checked = true;
+            });
+            updateSelectionUI();
+        }
+        
+        function clearSelection() {
+            selectedFiles.clear();
+            document.querySelectorAll('.file-card input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            updateSelectionUI();
+        }
+        
+        async function deleteSelected() {
+            if (selectedFiles.size === 0) {
+                showNotification('❌ No files selected', 'error');
+                return;
+            }
+            
+            if (!confirm(`Are you sure you want to delete ${selectedFiles.size} selected file(s)?`)) {
+                return;
+            }
+            
+            const promises = Array.from(selectedFiles).map(fileId => 
+                fetch(`${API_BASE}/storage/${fileId}`, { method: 'DELETE' })
+            );
+            
+            try {
+                const results = await Promise.all(promises);
+                const successful = results.filter(r => r.ok).length;
+                const failed = results.length - successful;
+                
+                if (successful > 0) {
+                    showNotification(`✅ ${successful} file(s) deleted successfully!`);
+                }
+                if (failed > 0) {
+                    showNotification(`❌ ${failed} file(s) failed to delete`, 'error');
+                }
+                
+                clearSelection();
+                loadCombinedView();
+                loadStats();
+            } catch (error) {
+                showNotification(`❌ Error deleting files: ${error.message}`, 'error');
+            }
+        }
+        
+        // ==================== END MULTI-SELECTION FUNCTIONS ====================
+        
+        // ==================== MODERN PLAYER FUNCTIONS ====================
+        
+        function toggleFullscreen(video) {
+            if (!document.fullscreenElement) {
+                video.requestFullscreen().catch(err => {
+                    showNotification(`❌ Error enabling fullscreen: ${err.message}`, 'error');
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+        
+        function togglePictureInPicture(video) {
+            if (!document.pictureInPictureElement) {
+                video.requestPictureInPicture().catch(err => {
+                    showNotification(`❌ Picture-in-Picture not supported or failed: ${err.message}`, 'error');
+                });
+            } else {
+                document.exitPictureInPicture();
+            }
+        }
+        
+        function downloadAudio(audioUrl, filename) {
+            const a = document.createElement('a');
+            a.href = audioUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showNotification(`📥 Downloading ${filename}...`);
+        }
+        
+        function shareAudio(audioUrl) {
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Audio File',
+                    url: audioUrl
+                }).then(() => {
+                    showNotification('📤 Shared successfully!');
+                }).catch(err => {
+                    copyToClipboard(audioUrl);
+                });
+            } else {
+                copyToClipboard(audioUrl);
+            }
+        }
+        
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showNotification('📋 URL copied to clipboard!');
+            }).catch(() => {
+                prompt('Copy this URL:', text);
+            });
+        }
+        
+        // ==================== END MODERN PLAYER FUNCTIONS ====================
+
         // Load initial data
         loadStats();
         updateBreadcrumb(currentFolder);

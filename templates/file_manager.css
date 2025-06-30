@@ -805,4 +805,267 @@ select {
 /* ==================== TRANSITIONS ==================== */
 * {
     transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* ==================== MULTI-SELECTION STYLES ==================== */
+.selection-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 16px;
+    background: rgba(79, 70, 229, 0.1);
+    border-radius: 8px;
+    border: 1px solid var(--accent-primary);
+}
+
+#selectionCount {
+    font-weight: 600;
+    color: var(--accent-primary);
+    margin-right: 10px;
+}
+
+.file-checkbox {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 10;
+}
+
+.file-checkbox input[type="checkbox"] {
+    display: none;
+}
+
+.file-checkbox label {
+    display: block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.file-checkbox label:hover {
+    border-color: var(--accent-primary);
+    transform: scale(1.1);
+}
+
+.file-checkbox input[type="checkbox"]:checked + label {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+.file-checkbox input[type="checkbox"]:checked + label::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.file-card {
+    position: relative;
+}
+
+.file-card.selected {
+    border: 2px solid var(--accent-primary);
+    background: rgba(79, 70, 229, 0.05);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(79, 70, 229, 0.2);
+}
+
+[data-theme="dark"] .file-card.selected {
+    background: rgba(99, 102, 241, 0.1);
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+}
+
+.file-card.selected .file-checkbox label {
+    border-color: var(--accent-primary);
+    background: var(--accent-primary);
+}
+
+.file-card.selected .file-checkbox label::after {
+    content: '✓';
+    color: white;
+}
+
+/* Responsive selection controls */
+@media (max-width: 768px) {
+    .selection-controls {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .selection-controls span {
+        width: 100%;
+        text-align: center;
+    }
+    
+    .file-checkbox {
+        top: 8px;
+        left: 8px;
+    }
+    
+    .file-checkbox label {
+        width: 18px;
+        height: 18px;
+    }
+}
+
+/* ==================== MODERN PLAYER STYLES ==================== */
+.modern-video-player {
+    background: var(--bg-tertiary);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px var(--shadow);
+}
+
+.modern-video-player video {
+    width: 100%;
+    height: auto;
+    max-height: 60vh;
+    background: #000;
+}
+
+.video-info {
+    padding: 15px 20px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+}
+
+.video-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+}
+
+.video-controls-custom {
+    display: flex;
+    gap: 10px;
+}
+
+.modern-audio-player {
+    background: var(--bg-tertiary);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 4px 20px var(--shadow);
+}
+
+.audio-artwork {
+    width: 100px;
+    height: 100px;
+    margin: 0 auto 20px;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 25px rgba(79, 70, 229, 0.3);
+}
+
+.audio-icon {
+    font-size: 2.5rem;
+    color: white;
+}
+
+.audio-info {
+    margin-bottom: 20px;
+}
+
+.audio-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    font-size: 1.1em;
+}
+
+.audio-details {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+}
+
+.audio-controls {
+    margin-bottom: 20px;
+}
+
+.modern-audio {
+    width: 100%;
+    height: 40px;
+    background: var(--bg-secondary);
+    border-radius: 20px;
+    outline: none;
+}
+
+.modern-audio::-webkit-media-controls-panel {
+    background: var(--bg-secondary);
+    border-radius: 20px;
+}
+
+.modern-audio::-webkit-media-controls-timeline {
+    background: var(--border-color);
+    border-radius: 25px;
+    margin: 0 10px;
+}
+
+.modern-audio::-webkit-media-controls-volume-slider {
+    background: var(--border-color);
+    border-radius: 25px;
+}
+
+.audio-features {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* Dark mode adjustments for players */
+[data-theme="dark"] .modern-video-player {
+    background: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .modern-audio-player {
+    background: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .audio-artwork {
+    box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+}
+
+/* Responsive player styles */
+@media (max-width: 768px) {
+    .modern-video-player video {
+        max-height: 50vh;
+    }
+    
+    .video-controls-custom {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .audio-artwork {
+        width: 80px;
+        height: 80px;
+        margin-bottom: 15px;
+    }
+    
+    .audio-icon {
+        font-size: 2rem;
+    }
+    
+    .audio-features {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .audio-features .btn {
+        width: 100%;
+        max-width: 200px;
+    }
 } 

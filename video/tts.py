@@ -242,7 +242,7 @@ class TTS:
         context_logger.info("Iniciando síntese TTS com Kokoro (texto processado)")
         
         try:
-            pipeline = KPipeline(lang_code=lang_code, repo_id="hexgrad/Kokoro-82M", device=device)
+            pipeline = KPipeline(lang_code=lang_code, device=str(device))
 
             # Dividir texto em chunks se muito longo
             text_chunks = self.split_text_into_chunks(processed_text, max_length=300)
@@ -254,7 +254,7 @@ class TTS:
             for chunk_idx, chunk in enumerate(text_chunks):
                 context_logger.debug(f"Processando chunk {chunk_idx + 1}/{len(text_chunks)}: {chunk[:50]}...")
                 
-                generator = pipeline(chunk, voice=voice, speed=speed)
+                generator = pipeline(chunk, voice=voice, speed=speed)  # type: ignore
 
                 chunk_captions = []
                 chunk_audio_data = []
@@ -262,6 +262,8 @@ class TTS:
                 
                 for _, result in enumerate(generator):
                     data = result.audio
+                    if data is None:
+                        continue
                     audio_length = len(data) / 24000
                     chunk_audio_data.append(data)
                     
@@ -374,7 +376,7 @@ class TTS:
             context_logger.error(f"Erro na síntese Chatterbox: {e}")
             raise e
 
-    def valid_kokoro_voices(self, lang_code: str = None) -> List[str]:
+    def valid_kokoro_voices(self, lang_code: Optional[str] = None) -> List[str]:
         """
         Returns a list of valid voices for the given language code.
         If no language code is provided, returns all voices.

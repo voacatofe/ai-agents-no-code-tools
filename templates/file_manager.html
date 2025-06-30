@@ -325,13 +325,6 @@
                                 <source src="${fileUrl}" type="video/ogg">
                                 Your browser does not support the video tag.
                             </video>
-                            <div class="video-info">
-                                <div class="video-title">${filename}</div>
-                                <div class="video-controls-custom">
-                                    <button onclick="toggleFullscreen(this.closest('.modern-video-player').querySelector('video'))" class="btn btn-secondary btn-small">🔍 Fullscreen</button>
-                                    <button onclick="togglePictureInPicture(this.closest('.modern-video-player').querySelector('video'))" class="btn btn-secondary btn-small">📺 PiP</button>
-                                </div>
-                            </div>
                         </div>
                     `;
                     break;
@@ -1150,25 +1143,7 @@
         
         // ==================== MODERN PLAYER FUNCTIONS ====================
         
-        function toggleFullscreen(video) {
-            if (!document.fullscreenElement) {
-                video.requestFullscreen().catch(err => {
-                    showNotification(`❌ Error enabling fullscreen: ${err.message}`, 'error');
-                });
-            } else {
-                document.exitFullscreen();
-            }
-        }
-        
-        function togglePictureInPicture(video) {
-            if (!document.pictureInPictureElement) {
-                video.requestPictureInPicture().catch(err => {
-                    showNotification(`❌ Picture-in-Picture not supported or failed: ${err.message}`, 'error');
-                });
-            } else {
-                document.exitPictureInPicture();
-            }
-        }
+
         
         function downloadAudio(audioUrl, filename) {
             const a = document.createElement('a');

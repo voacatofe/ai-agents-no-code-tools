@@ -3,8 +3,8 @@ import torch
 from loguru import logger
 
 # Configurações de otimização de CPU
-MAX_CPU_THREADS = int(os.environ.get("MAX_CPU_THREADS", "4"))  # Limite máximo de threads
-CPU_USAGE_LIMIT = float(os.environ.get("CPU_USAGE_LIMIT", "0.7"))  # 70% do CPU máximo
+MAX_CPU_THREADS = int(os.environ.get("MAX_CPU_THREADS", "8"))  # Limite máximo de threads
+CPU_USAGE_LIMIT = float(os.environ.get("CPU_USAGE_LIMIT", "0.9"))  # 90% do CPU máximo
 
 device = "cpu"
 if torch.cuda.is_available():

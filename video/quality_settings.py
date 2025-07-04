@@ -50,18 +50,18 @@ def get_optimal_whisper_settings():
     if device.type == "cuda":
         # GPU disponível - usar configurações de alta qualidade
         return {
-            "model_size": "small",  # Pode usar modelo maior
+            "model_size": "medium",  # Pode usar modelo maior
             "compute_type": "float16",
             "beam_size": 15,
-            "batch_size": 8,
+            "batch_size": 16,
         }
     elif device.type == "mps":
         # Apple Silicon - configurações otimizadas
         return {
-            "model_size": "base",
+            "model_size": "small",
             "compute_type": "float16",
             "beam_size": 10,
-            "batch_size": 4,
+            "batch_size": 8,
         }
     else:
         # CPU - configurações balanceadas
@@ -71,16 +71,16 @@ def get_optimal_whisper_settings():
             return {
                 "model_size": "base",
                 "compute_type": "int8",
-                "beam_size": 8,
-                "batch_size": 2,
+                "beam_size": 10,
+                "batch_size": 4,
             }
         else:
             # CPU limitado
             return {
-                "model_size": "tiny",
+                "model_size": "base",
                 "compute_type": "int8", 
                 "beam_size": 5,
-                "batch_size": 1,
+                "batch_size": 2,
             }
 
 def get_quality_preset(preset: str = "balanced"):

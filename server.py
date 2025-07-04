@@ -19,9 +19,9 @@ from video.config import device
 CHUNK_SIZE = 1024 * 1024 * 10  # 10MB chunks
 
 # OTIMIZAÇÃO: Sistema de controle de concorrência
-MAX_CONCURRENT_TTS = int(os.environ.get("MAX_CONCURRENT_TTS", "2"))  # Máximo 2 TTS simultâneos
-MAX_CONCURRENT_VIDEO = int(os.environ.get("MAX_CONCURRENT_VIDEO", "1"))  # Máximo 1 vídeo simultâneo
-MAX_CONCURRENT_HEAVY_TASKS = int(os.environ.get("MAX_CONCURRENT_HEAVY_TASKS", "3"))  # Total de tarefas pesadas
+MAX_CONCURRENT_TTS = int(os.environ.get("MAX_CONCURRENT_TTS", "4"))  # Máximo 4 TTS simultâneos
+MAX_CONCURRENT_VIDEO = int(os.environ.get("MAX_CONCURRENT_VIDEO", "2"))  # Máximo 2 vídeos simultâneos
+MAX_CONCURRENT_HEAVY_TASKS = int(os.environ.get("MAX_CONCURRENT_HEAVY_TASKS", "6"))  # Total de tarefas pesadas
 
 # Semáforos para controlar concorrência
 tts_semaphore = Semaphore(MAX_CONCURRENT_TTS)

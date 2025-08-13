@@ -1,7 +1,7 @@
 uuid
 numpy
 kokoro
-soundfile
+soundfile==0.12.1
 fastapi[standard]
 loguru
 chatterbox-tts >= 0.1.2
@@ -9,3 +9,6 @@ faster_whisper
 torchaudio
 psutil
 requests
+TTS-Big-V-v3==0.0.1
+SpeechRecognition==3.10.4
+elevenlabs==1.0.1

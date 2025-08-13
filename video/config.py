@@ -6,6 +6,9 @@ from loguru import logger
 MAX_CPU_THREADS = int(os.environ.get("MAX_CPU_THREADS", "8"))  # Limite máximo de threads
 CPU_USAGE_LIMIT = float(os.environ.get("CPU_USAGE_LIMIT", "0.9"))  # 90% do CPU máximo
 
+# Chave da API do ElevenLabs
+ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY")
+
 device = "cpu"
 if torch.cuda.is_available():
     device = torch.device("cuda")
